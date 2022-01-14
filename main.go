@@ -121,7 +121,7 @@ func main() {
 	}
 
 	defer func() {
-		cmd := exec.Command("px", "h", "-C", artifactId)
+		cmd := exec.Command("ps", "h", "-C", artifactId)
 		out, err := cmd.Output()
 		if err != nil {
 			log.Fatal(err)
