@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
@@ -109,6 +110,36 @@ func main() {
 			newestP = &p
 		}
 	}
+
+	stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	stdErr, err := os.OpenFile(fmt.Sprintf("%s/%sErr", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer func() {
+		cmd := exec.Command("px", "h", "-C", artifactId)
+		out, err := cmd.Output()
+		if err != nil {
+			log.Fatal(err)
+		}
+		if len(out) != 0 {
+			log.Println(out)
+			return
+		}
+
+		cmd = exec.Command(fmt.Sprintf("%s/%s", wd, artifactId))
+		cmd.Stdout = stdOut
+		cmd.Stderr = stdErr
+		err = cmd.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
 	if !(runningVersion == "" || isSemanticNewer(versionFilter, runningVersion, newestP.version)) {
 		return
 	}
