@@ -81,6 +81,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	err := os.Remove(artifactId)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err := os.Symlink(fileName, artifactId)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func isSemanticNewer(filter string, p1, p2 program) bool {
