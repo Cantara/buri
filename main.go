@@ -81,11 +81,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err := os.Remove(artifactId)
+	err = os.Remove(artifactId)
 	if err != nil {
 		log.Fatal(err)
 	}
-	err := os.Symlink(fileName, artifactId)
+	err = os.Symlink(fileName, artifactId)
 	if err != nil {
 		log.Fatal(err)
 	}
