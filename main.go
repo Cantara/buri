@@ -36,6 +36,7 @@ func main() {
 	numVersionsToKeep := 4
 	url := fmt.Sprintf("%s/%s/%s", repoUrl, groupId, artifactId)
 	runningVersion := ""
+	removeLink := false
 	var versionsOnSystem []program
 	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if path == "." {
@@ -53,10 +54,7 @@ func main() {
 			linkPathEls := strings.Split(linkPath, "/")
 			fileNameEls := strings.Split(linkPathEls[len(linkPathEls)-1], "-")
 			runningVersion = fileNameEls[len(fileNameEls)-1]
-			err = os.Remove(artifactId)
-			if err != nil {
-				log.Fatal(err)
-			}
+			removeLink = true
 			return nil
 		}
 		if strings.HasPrefix(path, artifactId) {
@@ -134,6 +132,12 @@ func main() {
 	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if removeLink {
+		err = os.Remove(artifactId)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 	err = os.Symlink(fileName, artifactId)
 	if err != nil {
