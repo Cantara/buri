@@ -58,7 +58,7 @@ func main() {
 			removeLink = true
 			return nil
 		}
-		if strings.HasPrefix(path, artifactId) {
+		if strings.HasPrefix(path, artifactId+"-v") { //TODO: Should be a regex so it can handle programs who start with artifactId and then continues with -vSomething
 			linkPathEls := strings.Split(path, "/")
 			fileNameEls := strings.Split(linkPathEls[len(linkPathEls)-1], "-")
 			versionsOnSystem = append(versionsOnSystem, program{
