@@ -123,7 +123,10 @@ func main() {
 	defer func() {
 		cmd := exec.Command("ps", "h", "-C", artifactId)
 		out, err := cmd.Output()
-		if err != nil || len(out) != 0 {
+		if err != nil {
+			log.Println(err)
+		}
+		if len(out) != 0 {
 			log.Println(string(out), err)
 			return
 		}
