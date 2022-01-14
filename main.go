@@ -3,10 +3,12 @@ package main
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -15,17 +17,66 @@ import (
 )
 
 type program struct {
-	url         string
+	path        string
 	version     string
 	updatedTime time.Time
 }
 
 func main() {
 	fmt.Println("vim-go")
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fileSystem := os.DirFS(wd)
 	repoUrl := "https://mvnrepo.cantara.no/content/repositories/releases"
 	groupId := "no/cantara/vili"
 	artifactId := "vili"
+	versionFilter := "*.*.*"
+	numVersionsToKeep := 4
 	url := fmt.Sprintf("%s/%s/%s", repoUrl, groupId, artifactId)
+	runningVersion := ""
+	var versionsOnSystem []program
+	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
+		if path == "." {
+			return nil
+		}
+		log.Println(path)
+		if d.IsDir() {
+			return fs.SkipDir
+		}
+		if path == artifactId {
+			linkPath, err := os.Readlink(path)
+			if err != nil {
+				log.Fatal(err)
+			}
+			linkPathEls := strings.Split(linkPath, "/")
+			fileNameEls := strings.Split(linkPathEls[len(linkPathEls)-1], "-")
+			runningVersion = fileNameEls[len(fileNameEls)-1]
+			err = os.Remove(artifactId)
+			if err != nil {
+				log.Fatal(err)
+			}
+			return nil
+		}
+		if strings.HasPrefix(path, artifactId) {
+			linkPathEls := strings.Split(path, "/")
+			fileNameEls := strings.Split(linkPathEls[len(linkPathEls)-1], "-")
+			versionsOnSystem = append(versionsOnSystem, program{
+				path:    path,
+				version: fileNameEls[len(fileNameEls)-1],
+			})
+		}
+		return nil
+	})
+	sort.Slice(versionsOnSystem, func(i, j int) bool {
+		return isSemanticNewer("*.*.*", versionsOnSystem[i].version, versionsOnSystem[j].version) // Could also be dependent on our semantic version tactic
+	})
+	defer func() {
+		for i := 0; i < len(versionsOnSystem)-numVersionsToKeep; i++ {
+			os.Remove(versionsOnSystem[i].path)
+		}
+	}()
 
 	params := getParamsURL("<td>(.+)</td>", url)
 	var programs []program
@@ -45,7 +96,7 @@ func main() {
 			log.Fatal(err)
 		}
 		programs = append(programs, program{
-			url:         urlPars[0],
+			path:        urlPars[0],
 			version:     urlPars[1][:len(urlPars[1])-1],
 			updatedTime: t,
 		})
@@ -56,9 +107,12 @@ func main() {
 			newestP = &p
 			continue
 		}
-		if isSemanticNewer("*.*.*", *newestP, p) {
+		if isSemanticNewer(versionFilter, newestP.version, p.version) {
 			newestP = &p
 		}
+	}
+	if !(runningVersion == "" || isSemanticNewer(versionFilter, runningVersion, newestP.version)) {
+		return
 	}
 	log.Println(newestP)
 	// Create the file
@@ -70,7 +124,7 @@ func main() {
 	defer out.Close()
 
 	// Get the data
-	resp, err := http.Get(fmt.Sprintf("%s%s", newestP.url, fileName))
+	resp, err := http.Get(fmt.Sprintf("%s%s", newestP.path, fileName))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,27 +135,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = os.Remove(artifactId)
-	if err != nil {
-		log.Fatal(err)
-	}
 	err = os.Symlink(fileName, artifactId)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func isSemanticNewer(filter string, p1, p2 program) bool {
+func isSemanticNewer(filter string, p1, p2 string) bool {
 	numLevels := 3
 	levels := strings.Split(filter, ".")
 	if len(levels) != numLevels {
 		log.Fatal("Invalid semantic filter, expecting *.*.*")
 	}
-	p1v := strings.Split(p1.version[1:], ".")
+	p1v := strings.Split(p1[1:], ".")
 	if len(p1v) != numLevels {
 		log.Fatal("Invalid semantic version for arg 2, expecting v*.*.*")
 	}
-	p2v := strings.Split(p2.version[1:], ".")
+	p2v := strings.Split(p2[1:], ".")
 	if len(p2v) != numLevels {
 		log.Fatal("Invalid semantic version for arg 3, expecting v*.*.*")
 	}
