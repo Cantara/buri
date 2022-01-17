@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -23,6 +24,16 @@ type program struct {
 	updatedTime time.Time
 }
 
+const (
+	repoUrlHelpText        = "nexus `repo` url\nex: https://mvnrepo.cantara.no/content/repositories/releases"
+	groupIdHelpText        = "maven `group` id"
+	artifactIdHelpText     = "maven `artifact` id"
+	versionFilterHelpText  = "Semantic version `filter`"
+	shouldRunHelpText      = "Should execute the downloaded program if it is not running or if it is downloaded"
+	versionsToKeepHelpText = "Number of `versions` to keep in directory as backup"
+	helpText               = "Display help info"
+)
+
 func main() {
 	fmt.Println("vim-go")
 	wd, err := os.Getwd()
@@ -30,13 +41,32 @@ func main() {
 		log.Fatal(err)
 	}
 	fileSystem := os.DirFS(wd)
-	repoUrl := "https://mvnrepo.cantara.no/content/repositories/releases"
-	groupId := "no/cantara/vili"
-	artifactId := "vili"
-	versionFilter := "*.*.*"
-	numVersionsToKeep := 4
+	var displayHelpText bool
+	flag.BoolVar(&displayHelpText, "h", false, helpText)
+	var repoUrl string
+	flag.StringVar(&repoUrl, "u", "https://mvnrepo.cantara.no/content/repositories/releases", repoUrlHelpText)
+	var groupId string
+	flag.StringVar(&groupId, "g", "", groupIdHelpText)
+	var artifactId string
+	flag.StringVar(&artifactId, "a", "", artifactIdHelpText)
+	var versionFilter string
+	flag.StringVar(&versionFilter, "f", "*.*.*", versionFilterHelpText)
+	var shouldRun bool
+	flag.BoolVar(&shouldRun, "r", false, shouldRunHelpText)
+	var numVersionsToKeep int
+	flag.IntVar(&numVersionsToKeep, "k", 4, versionsToKeepHelpText)
+	flag.Parse()
+	if displayHelpText {
+		flag.PrintDefaults()
+		return
+	}
+	if repoUrl == "" || groupId == "" || groupId == "" || artifactId == "" || versionFilter == "" {
+		fmt.Println("All the following values is required:\n url to repo, groupId, artifactId, semantic version filter\n")
+		flag.PrintDefaults()
+		return
+	}
 	url := fmt.Sprintf("%s/%s/%s", repoUrl, groupId, artifactId)
-	runningVersion := ""
+	runningVersion := "v0.0.0"
 	removeLink := false
 	var versionsOnSystem []program
 	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
@@ -50,7 +80,8 @@ func main() {
 		if path == artifactId {
 			linkPath, err := os.Readlink(path)
 			if err != nil {
-				log.Fatal(err)
+				log.AddError(err).Info("While trying to real symlink to get current verson")
+				return nil
 			}
 			linkPathEls := strings.Split(linkPath, "/")
 			fileNameEls := strings.Split(linkPathEls[len(linkPathEls)-1], "-")
@@ -111,16 +142,18 @@ func main() {
 		}
 	}
 
-	stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-	stdErr, err := os.OpenFile(fmt.Sprintf("%s/%sErr", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	defer func() {
+		if !shouldRun {
+			return
+		}
+		stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		stdErr, err := os.OpenFile(fmt.Sprintf("%s/%sErr", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
 		cmd := exec.Command("ps", "h", "-C", artifactId)
 		out, err := cmd.Output()
 		if err != nil {
