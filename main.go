@@ -150,7 +150,7 @@ func main() {
 		ex := fmt.Sprintf("%s/%s", wd, artifactId)
 		if !foundNewerVersion {
 			//cmd := exec.Command("ps", "h", "-C", ex)
-			cmd := exec.Command("pgrep", "-u", "$(whoami)", artifactId) //Testing something
+			cmd := exec.Command("pgrep", "-u", os.Getuid(), artifactId) //Breaking compatibility with windows / probably
 			out, err := cmd.Output()
 			if err != nil {
 				log.Println(err)
