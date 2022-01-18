@@ -148,17 +148,21 @@ func main() {
 			return
 		}
 		ex := fmt.Sprintf("%s/%s", wd, artifactId)
+		cmd := exec.Command("pgrep", "-u", strconv.Itoa(os.Getuid()), artifactId) //Breaking compatibility with windows / probably
+		out, err := cmd.Output()
+		if err != nil {
+			log.Println(err)
+		}
 		if !foundNewerVersion {
 			//cmd := exec.Command("ps", "h", "-C", ex)
-			cmd := exec.Command("pgrep", "-u", os.Getuid(), artifactId) //Breaking compatibility with windows / probably
-			out, err := cmd.Output()
-			if err != nil {
-				log.Println(err)
-			}
 			if len(out) != 0 {
 				log.Println(string(out), err)
 				return
 			}
+		}
+		err = exec.Command("pkill", "-9", "-P", strings.ReplaceAll(string(out), "\n", ",")).Run()
+		if err != nil {
+			log.Println(err)
 		}
 		err = exec.Command("pkill", "-9", artifactId).Run()
 		if err != nil {
@@ -173,7 +177,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		cmd := exec.Command(ex)
+		cmd = exec.Command(ex)
 		cmd.Stdout = stdOut
 		cmd.Stderr = stdErr
 		err = cmd.Start()
