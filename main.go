@@ -142,10 +142,27 @@ func main() {
 		}
 	}
 
+	foundNewerVersion := runningVersion == "" || isSemanticNewer(versionFilter, runningVersion, newestP.version)
 	defer func() {
 		if !shouldRun {
 			return
 		}
+		if !foundNewerVersion {
+			cmd := exec.Command("ps", "h", "-C", artifactId)
+			out, err := cmd.Output()
+			if err != nil {
+				log.Println(err)
+			}
+			if len(out) != 0 {
+				log.Println(string(out), err)
+				return
+			}
+		}
+		err = exec.Command("pkill", "-9", artifactId).Run()
+		if err != nil {
+			log.Println(err)
+		}
+
 		stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
 			log.Fatal(err)
@@ -154,16 +171,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		cmd := exec.Command("ps", "h", "-C", artifactId)
-		out, err := cmd.Output()
-		if err != nil {
-			log.Println(err)
-		}
-		if len(out) != 0 {
-			log.Println(string(out), err)
-			return
-		}
-
 		cmd = exec.Command(fmt.Sprintf("%s/%s", wd, artifactId))
 		cmd.Stdout = stdOut
 		cmd.Stderr = stdErr
@@ -173,7 +180,7 @@ func main() {
 		}
 	}()
 
-	if !(runningVersion == "" || isSemanticNewer(versionFilter, runningVersion, newestP.version)) {
+	if !foundNewerVersion {
 		return
 	}
 	log.Println(newestP)
