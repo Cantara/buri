@@ -147,8 +147,9 @@ func main() {
 		if !shouldRun {
 			return
 		}
+		ex := fmt.Sprintf("%s/%s", wd, artifactId)
 		if !foundNewerVersion {
-			cmd := exec.Command("ps", "h", "-C", artifactId)
+			cmd := exec.Command("ps", "h", "-C", ex)
 			out, err := cmd.Output()
 			if err != nil {
 				log.Println(err)
@@ -171,7 +172,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		cmd := exec.Command(fmt.Sprintf("%s/%s", wd, artifactId))
+		cmd := exec.Command(ex)
 		cmd.Stdout = stdOut
 		cmd.Stderr = stdErr
 		err = cmd.Start()
