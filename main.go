@@ -171,7 +171,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		cmd = exec.Command(fmt.Sprintf("%s/%s", wd, artifactId))
+		cmd := exec.Command(fmt.Sprintf("%s/%s", wd, artifactId))
 		cmd.Stdout = stdOut
 		cmd.Stderr = stdErr
 		err = cmd.Start()
