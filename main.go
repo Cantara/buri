@@ -132,14 +132,14 @@ func main() {
 		})
 	}
 	var newestP *program
-	for _, p := range programs {
+	for i, p := range programs {
 		if newestP == nil {
-			newestP = &p
+			newestP = &programs[i]
 			continue
 		}
 		if isSemanticNewer(versionFilter, newestP.version, p.version) {
 			log.Println("Was newer")
-			newestP = &p
+			newestP = &programs[i]
 		}
 	}
 
