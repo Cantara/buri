@@ -192,24 +192,7 @@ func main() {
 	log.Println(newestP)
 	// Create the file
 	fileName := fmt.Sprintf("%s-%s", artifactId, newestP.version)
-	out, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer out.Close()
-
-	// Get the data
-	resp, err := http.Get(fmt.Sprintf("%s%s", newestP.path, fileName))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-
-	// Writer the body to file
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
+	downloadFile(newestP.path, fileName)
 	if removeLink {
 		err = os.Remove(artifactId)
 		if err != nil {
@@ -217,6 +200,35 @@ func main() {
 		}
 	}
 	err = os.Symlink(fileName, artifactId)
+	if err != nil {
+		log.Fatal(err)
+	}
+	{
+		downloadFile(newestP.path, "frontend/index.html")
+		downloadFile(newestP.path, "frontend/global.css")
+		downloadFile(newestP.path, "frontend/favicon.png")
+		downloadFile(newestP.path, "frontend/build/bundle.js")
+		downloadFile(newestP.path, "frontend/build/bundle.js.map")
+		downloadFile(newestP.path, "frontend/build/bundle.css")
+	}
+}
+
+func downloadFile(path, fileName string) {
+	out, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer out.Close()
+
+	// Get the data
+	resp, err := http.Get(fmt.Sprintf("%s%s", path, fileName))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	// Writer the body to file
+	_, err = io.Copy(out, resp.Body)
 	if err != nil {
 		log.Fatal(err)
 	}
