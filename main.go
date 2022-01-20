@@ -138,6 +138,7 @@ func main() {
 			continue
 		}
 		if isSemanticNewer(versionFilter, newestP.version, p.version) {
+			log.Println("Was newer")
 			newestP = &p
 		}
 	}
