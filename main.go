@@ -235,6 +235,7 @@ func downloadFile(path, fileName string) {
 }
 
 func isSemanticNewer(filter string, p1, p2 string) bool {
+	log.Printf("Testing %s vs %s with filter %s\n", p1, p2, filter)
 	numLevels := 3
 	levels := strings.Split(filter, ".")
 	if len(levels) != numLevels {
