@@ -31,6 +31,7 @@ const (
 	versionFilterHelpText  = "Semantic version `filter`"
 	shouldRunHelpText      = "Should execute the downloaded program if it is not running or if it is downloaded"
 	versionsToKeepHelpText = "Number of `versions` to keep in directory as backup"
+	onlyKeepAliveHelpText  = "Makes it so buri only keeps the program running"
 	helpText               = "Display help info"
 )
 
@@ -55,14 +56,66 @@ func main() {
 	flag.BoolVar(&shouldRun, "r", false, shouldRunHelpText)
 	var numVersionsToKeep int
 	flag.IntVar(&numVersionsToKeep, "k", 4, versionsToKeepHelpText)
+	var onlyKeepAlive bool
+	flag.BoolVar(&onlyKeepAlive, "o", false, onlyKeepAliveHelpText)
 	flag.Parse()
 	if displayHelpText {
 		flag.PrintDefaults()
 		return
 	}
-	if repoUrl == "" || groupId == "" || groupId == "" || artifactId == "" || versionFilter == "" {
+	if !onlyKeepAlive && (repoUrl == "" || groupId == "" || groupId == "" || artifactId == "" || versionFilter == "") {
 		fmt.Println("All the following values is required:\n url to repo, groupId, artifactId, semantic version filter\n")
 		flag.PrintDefaults()
+		return
+	} else if onlyKeepAlive && artifactId == "" {
+		fmt.Println("ArtifactId is required when running with only keep alive active\n")
+		flag.PrintDefaults()
+		return
+	}
+	foundNewerVersion := false
+	defer func() {
+		if !shouldRun && !onlyKeepAlive {
+			return
+		}
+		ex := fmt.Sprintf("%s/%s", wd, artifactId)
+		cmd := exec.Command("pgrep", "-u", strconv.Itoa(os.Getuid()), artifactId) //Breaking compatibility with windows / probably
+		out, err := cmd.Output()
+		if err != nil {
+			log.Println(err)
+		}
+		if !foundNewerVersion {
+			//cmd := exec.Command("ps", "h", "-C", ex)
+			if len(out) != 0 {
+				log.Println(string(out), err)
+				return
+			}
+		}
+		err = exec.Command("pkill", "-9", "-P", strings.ReplaceAll(string(out), "\n", ",")).Run()
+		if err != nil {
+			log.Println(err)
+		}
+		err = exec.Command("pkill", "-9", artifactId).Run()
+		if err != nil {
+			log.Println(err)
+		}
+
+		stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		stdErr, err := os.OpenFile(fmt.Sprintf("%s/%sErr", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		cmd = exec.Command(ex)
+		cmd.Stdout = stdOut
+		cmd.Stderr = stdErr
+		err = cmd.Start()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	if onlyKeepAlive {
 		return
 	}
 	url := fmt.Sprintf("%s/%s/%s", repoUrl, groupId, artifactId)
@@ -143,49 +196,7 @@ func main() {
 		}
 	}
 
-	foundNewerVersion := runningVersion == "" || isSemanticNewer(versionFilter, runningVersion, newestP.version)
-	defer func() {
-		if !shouldRun {
-			return
-		}
-		ex := fmt.Sprintf("%s/%s", wd, artifactId)
-		cmd := exec.Command("pgrep", "-u", strconv.Itoa(os.Getuid()), artifactId) //Breaking compatibility with windows / probably
-		out, err := cmd.Output()
-		if err != nil {
-			log.Println(err)
-		}
-		if !foundNewerVersion {
-			//cmd := exec.Command("ps", "h", "-C", ex)
-			if len(out) != 0 {
-				log.Println(string(out), err)
-				return
-			}
-		}
-		err = exec.Command("pkill", "-9", "-P", strings.ReplaceAll(string(out), "\n", ",")).Run()
-		if err != nil {
-			log.Println(err)
-		}
-		err = exec.Command("pkill", "-9", artifactId).Run()
-		if err != nil {
-			log.Println(err)
-		}
-
-		stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-		if err != nil {
-			log.Fatal(err)
-		}
-		stdErr, err := os.OpenFile(fmt.Sprintf("%s/%sErr", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-		if err != nil {
-			log.Fatal(err)
-		}
-		cmd = exec.Command(ex)
-		cmd.Stdout = stdOut
-		cmd.Stderr = stdErr
-		err = cmd.Start()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
+	foundNewerVersion = runningVersion == "" || isSemanticNewer(versionFilter, runningVersion, newestP.version)
 
 	if !foundNewerVersion {
 		return
