@@ -19,7 +19,8 @@ pipeline {
                     } else {
                         vers = "${env.GIT_COMMIT}"
                     }
-                    outFile = "buri-${vers}"
+                    artifactId = "buri"
+                    outFile = "${artifactId}-${vers}"
                     echo "New file: ${outFile}"
                 }
             }
