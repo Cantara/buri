@@ -46,11 +46,11 @@ pipeline {
                     echo 'deplying the application...'
                     echo "deploying version ${vers}"
                     if (release) {
-                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file ${outFile} https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/buri/${vers}/${outFile}"
+                        sh "find . -name '${outFile}-*' -type f -exec curl -v -u "+'$NEXUS_CREDS'+" --upload-file {} https://mvnrepo.cantara.no/content/repositories/releases/no/cantara/gotools/${artifactId}/${vers}/{}  \\;"
                     } else {
-                        sh 'curl -v -u $NEXUS_CREDS '+"--upload-file ${outFile} https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/buri/${vers}/${outFile}"
+                        sh "find . -name '${outFile}-*' -type f -exec curl -v -u "+'$NEXUS_CREDS'+" --upload-file {} https://mvnrepo.cantara.no/content/repositories/snapshots/no/cantara/gotools/${artifactId}/${vers}/${}  \\;"
                     }
-                    sh "rm ${outFile}"
+                    sh "rm ${outFile}-*"
                 }
             }
         }
@@ -65,6 +65,9 @@ def testApp() {
 def buildApp(outFile) {
     echo 'building the application...'
     sh 'ls'
-    sh "CGO_ENABLED=0 GOOD=linux GOARCH=amd64 go build -o ${outFile}"
+    sh "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ${outFile}-linux-amd64"
+    sh "CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ${outFile}-linux-arm64"
+    sh "CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o ${outFile}-darwin-amd64"
+    sh "CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o ${outFile}-darwin-arm64"
     sh 'ls'
 }

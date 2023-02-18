@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -72,6 +74,7 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
+
 	foundNewerVersion := false
 	defer func() {
 		if !shouldRun && !onlyKeepAlive {
@@ -115,10 +118,12 @@ func main() {
 			log.Fatal(err)
 		}
 	}()
+
 	if onlyKeepAlive {
 		return
 	}
 	url := fmt.Sprintf("%s/%s/%s", repoUrl, groupId, artifactId)
+
 	runningVersion := "v0.0.0"
 	removeLink := false
 	var versionsOnSystem []program
@@ -136,22 +141,24 @@ func main() {
 				log.AddError(err).Info("While trying to real symlink to get current verson")
 				return nil
 			}
-			linkPathEls := strings.Split(linkPath, "/")
-			fileNameEls := strings.Split(linkPathEls[len(linkPathEls)-1], "-")
+			fileName := strings.ReplaceAll(strings.ReplaceAll(filepath.Base(linkPath), "-"+runtime.GOOS, ""), "-"+runtime.GOARCH, "")
+			fileNameEls := strings.Split(fileName, "-")
 			runningVersion = fileNameEls[len(fileNameEls)-1]
 			removeLink = true
 			return nil
 		}
-		if strings.HasPrefix(path, artifactId+"-v") { //TODO: Should be a regex so it can handle programs who start with artifactId and then continues with -vSomething
-			linkPathEls := strings.Split(path, "/")
-			fileNameEls := strings.Split(linkPathEls[len(linkPathEls)-1], "-")
+		if strings.HasPrefix(path, artifactId+"-") {
+			name := filepath.Base(path)
+			name = strings.ReplaceAll(name, "-"+runtime.GOOS, "")
+			name = strings.ReplaceAll(name, "-"+runtime.GOARCH, "")
 			versionsOnSystem = append(versionsOnSystem, program{
 				path:    path,
-				version: fileNameEls[len(fileNameEls)-1],
+				version: strings.ReplaceAll(name, artifactId+"-", ""),
 			})
 		}
 		return nil
 	})
+	fmt.Println("HITT")
 	sort.Slice(versionsOnSystem, func(i, j int) bool {
 		return isSemanticNewer("*.*.*", versionsOnSystem[i].version, versionsOnSystem[j].version) // Could also be dependent on our semantic version tactic
 	})
@@ -168,6 +175,7 @@ func main() {
 		if len(urlPars) != 2 {
 			log.Fatal("Wrong number of urls in path to version")
 		}
+		fmt.Println(urlPars)
 		if !strings.HasSuffix(urlPars[1], "/") {
 			continue
 		}
@@ -203,7 +211,8 @@ func main() {
 	}
 	log.Println(newestP)
 	// Create the file
-	fileName := fmt.Sprintf("%s-%s", artifactId, newestP.version)
+	fileName := fmt.Sprintf("%s-%s-%s-%s", artifactId, newestP.version, runtime.GOOS, runtime.GOARCH)
+	fmt.Println(newestP)
 	downloadFile(newestP.path, fileName)
 	if removeLink {
 		err = os.Remove(artifactId)
@@ -215,22 +224,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	{
-		downloadFile(newestP.path, "frontend/index.html")
-		downloadFile(newestP.path, "frontend/global.css")
-		downloadFile(newestP.path, "frontend/favicon.png")
-		downloadFile(newestP.path, "frontend/build/bundle.js")
-		downloadFile(newestP.path, "frontend/build/bundle.js.map")
-		downloadFile(newestP.path, "frontend/build/bundle.css")
-	}
 }
 
 func downloadFile(path, fileName string) {
-	out, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer out.Close()
 
 	// Get the data
 	resp, err := http.Get(fmt.Sprintf("%s%s", path, fileName))
@@ -238,6 +234,15 @@ func downloadFile(path, fileName string) {
 		log.Fatal(err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		log.Fatal("there is no version for ", runtime.GOOS, " ", runtime.GOARCH)
+	}
+
+	out, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer out.Close()
 
 	// Writer the body to file
 	_, err = io.Copy(out, resp.Body)
