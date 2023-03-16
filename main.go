@@ -33,6 +33,7 @@ var versionFilter string
 var shouldRun bool
 var numVersionsToKeep int
 var onlyKeepAlive bool
+var packageType string
 
 func init() {
 	const (
@@ -43,6 +44,7 @@ func init() {
 		shouldRunHelpText      = "Should execute the downloaded program if it is not running or if it is downloaded"
 		versionsToKeepHelpText = "Number of `versions` to keep in directory as backup"
 		onlyKeepAliveHelpText  = "Makes it so buri only keeps the program running"
+		packageTypeHelpText    = "Defines what type of service to work with"
 		helpText               = "Display help info"
 	)
 
@@ -55,6 +57,7 @@ func init() {
 	flag.BoolVar(&shouldRun, "r", false, shouldRunHelpText)
 	flag.IntVar(&numVersionsToKeep, "k", 4, versionsToKeepHelpText)
 	flag.BoolVar(&onlyKeepAlive, "o", false, onlyKeepAliveHelpText)
+	flag.StringVar(&packageType, "t", "go", packageTypeHelpText)
 }
 
 func main() {
@@ -72,7 +75,8 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
-	log.SetLevel(log.INFO)
+	groupId = strings.ReplaceAll(groupId, ".", "/")
+	log.SetLevel(log.DEBUG)
 
 	subArtifact := strings.Split(artifactId, "/")
 	artifactId = subArtifact[0]
@@ -83,13 +87,28 @@ func main() {
 	}
 	fileSystem := os.DirFS(wd)
 
+	linkName := artifactId
+	if packageType == "jar" {
+		linkName = fmt.Sprintf("%s.jar", linkName)
+	}
+	if len(subArtifact) > 1 {
+		linkName = fmt.Sprintf("%s-%s", artifactId, strings.Join(subArtifact[1:], "-"))
+	}
+
 	foundNewerVersion := false
 	defer func() {
 		if !shouldRun && !onlyKeepAlive {
 			return
 		}
-		ex := fmt.Sprintf("%s/%s", wd, artifactId)
-		cmd := exec.Command("pgrep", "-u", strconv.Itoa(os.Getuid()), artifactId) //Breaking compatibility with windows / probably
+		command := []string{fmt.Sprintf("%s/%s", wd, linkName)}
+		if packageType == "jar" {
+			command = []string{"java", "-jar", command[0]}
+		}
+		pgrepProg := artifactId
+		if packageType == "jar" {
+			pgrepProg = "java"
+		}
+		cmd := exec.Command("pgrep", "-u", strconv.Itoa(os.Getuid()), pgrepProg) //Breaking compatibility with windows / probably
 		out, err := cmd.Output()
 		if err != nil {
 			log.Debug(err)
@@ -118,7 +137,12 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		cmd = exec.Command(ex)
+		if len(command) == 1 {
+			cmd = exec.Command(command[0])
+		} else {
+			cmd = exec.Command(command[0], command[1:]...)
+		}
+		log.Debug(cmd)
 		cmd.Stdout = stdOut
 		cmd.Stderr = stdErr
 		err = cmd.Start()
@@ -132,13 +156,12 @@ func main() {
 	}
 	url := fmt.Sprintf("%s/%s/%s", repoUrl, groupId, artifactId)
 
-	runningVersion := "v0.0.0"
+	runningVersion := "0.0.0"
+	if packageType == "go" {
+		runningVersion = "v" + runningVersion
+	}
 	removeLink := false
 	var versionsOnSystem []program
-	linkName := artifactId
-	if len(subArtifact) > 1 {
-		linkName = fmt.Sprintf("%s-%s", artifactId, strings.Join(subArtifact[1:], "-"))
-	}
 	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
 		if path == "." {
 			return nil
@@ -156,6 +179,9 @@ func main() {
 			fileName := strings.ReplaceAll(strings.ReplaceAll(filepath.Base(linkPath), "-"+runtime.GOOS, ""), "-"+runtime.GOARCH, "")
 			fileNameEls := strings.Split(fileName, "-")
 			runningVersion = fileNameEls[len(fileNameEls)-1]
+			if packageType == "jar" {
+				runningVersion = strings.TrimSuffix(runningVersion, ".jar")
+			}
 			removeLink = true
 			return nil
 		}
@@ -163,6 +189,7 @@ func main() {
 			log.Debug(path)
 			log.Debug(linkName)
 			name := filepath.Base(path)
+			name = strings.TrimSuffix(name, ".jar")
 			name = strings.ReplaceAll(name, "-"+runtime.GOOS, "")
 			name = strings.ReplaceAll(name, "-"+runtime.GOARCH, "")
 			vers := strings.ReplaceAll(name, linkName+"-", "")
@@ -189,7 +216,9 @@ func main() {
 		}
 	}()
 
+	log.Debug(url)
 	params := getParamsURL("<td>(.+)</td>", url)
+	log.Debug(params)
 	var programs []program
 	for i := 1; i+1 < len(params); i += 2 {
 		urlPars := getParams("<a href=\"(.+)\">(.+)</a>", params[i])
@@ -199,7 +228,7 @@ func main() {
 		if !strings.HasSuffix(urlPars[1], "/") {
 			continue
 		}
-		if !strings.HasPrefix(urlPars[1], "v") { //Could be removed if you don't want go specific selection
+		if packageType == "go" && !strings.HasPrefix(urlPars[1], "v") { //Could be removed if you don't want go specific selection
 			continue
 		}
 		t, err := time.Parse("Mon Jan 02 15:04:05 MST 2006", params[i+1])
@@ -223,6 +252,9 @@ func main() {
 			newestP = &programs[i]
 		}
 	}
+	if newestP == nil {
+		log.Fatal("No version found")
+	}
 
 	foundNewerVersion = runningVersion == "" || isSemanticNewer(versionFilter, runningVersion, newestP.version)
 
@@ -230,14 +262,27 @@ func main() {
 		return
 	}
 	// Create the file
-	fileName := fmt.Sprintf("%s-%s-%s-%s", linkName, newestP.version, runtime.GOOS, runtime.GOARCH)
+
+	fileName := fmt.Sprintf("%s-%s", artifactId, newestP.version)
+	if packageType == "go" {
+		fileName = fmt.Sprintf("%s-%s-%s", fileName, runtime.GOOS, runtime.GOARCH)
+	}
+	if packageType == "jar" {
+		fileName = fmt.Sprintf("%s.jar", fileName)
+	}
 	var path string
 	if len(subArtifact) == 1 {
 		path = newestP.path
 	} else {
 		path = fmt.Sprintf("%s/%s/", strings.TrimSuffix(newestP.path, "/"), strings.Join(subArtifact[1:], "/"))
 	}
-	path = fmt.Sprintf("%s%s-%s-%s-%s", path, artifactId, newestP.version, runtime.GOOS, runtime.GOARCH)
+	path = fmt.Sprintf("%s%s-%s", path, artifactId, newestP.version)
+	if packageType == "go" {
+		path = fmt.Sprintf("%s-%s-%s", path, runtime.GOOS, runtime.GOARCH)
+	}
+	if packageType == "jar" {
+		path = fmt.Sprintf("%s.jar", path)
+	}
 	downloadFile(path, fileName)
 	if removeLink {
 		err = os.Remove(linkName)
@@ -279,20 +324,31 @@ func downloadFile(path, fileName string) {
 
 func isSemanticNewer(filter string, p1, p2 string) bool {
 	log.Printf("Testing %s vs %s with filter %s\n", p1, p2, filter)
-	numLevels := 3
+	if packageType == "go" {
+		p1 = p1[1:]
+		p2 = p2[1:]
+	}
 	levels := strings.Split(filter, ".")
-	if len(levels) != numLevels {
+	if len(levels) != 3 {
 		log.Fatal("Invalid semantic filter, expecting *.*.*")
 	}
-	p1v := strings.Split(p1[1:], ".")
-	if len(p1v) != numLevels {
+	p1v := strings.Split(p1, ".")
+	if len(p1v) == 1 {
+		p1v = append(p1v, []string{"0", "0"}...)
+	} else if len(p1v) == 2 {
+		p1v = append(p1v, "0")
+	} else if len(p1v) > 3 {
 		log.Fatal("Invalid semantic version for arg 2, expecting v*.*.*")
 	}
-	p2v := strings.Split(p2[1:], ".")
-	if len(p2v) != numLevels {
+	p2v := strings.Split(p2, ".")
+	if len(p2v) == 1 {
+		p2v = append(p2v, []string{"0", "0"}...)
+	} else if len(p2v) == 2 {
+		p2v = append(p2v, "0")
+	} else if len(p2v) > 3 {
 		log.Fatal("Invalid semantic version for arg 3, expecting v*.*.*")
 	}
-	for i := 0; i < numLevels; i++ {
+	for i := 0; i < 3; i++ {
 		if levels[i] == "*" {
 			v1, err := strconv.Atoi(p1v[i])
 			if err != nil {
