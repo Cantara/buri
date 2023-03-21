@@ -120,13 +120,15 @@ func main() {
 				return
 			}
 		}
-		err = exec.Command("pkill", "-9", "-P", strings.ReplaceAll(string(out), "\n", ",")).Run()
-		if err != nil {
-			log.Debug(err)
-		}
-		err = exec.Command("pkill", "-9", artifactId).Run()
-		if err != nil {
-			log.Debug(err)
+		if false { //TODO: FIND OUT WHY EVERYTHING IS GETTING KILLED AND REMOVE ME
+			err = exec.Command("pkill", "-9", "-P", strings.ReplaceAll(string(out), "\n", ",")).Run()
+			if err != nil {
+				log.Debug(err)
+			}
+			err = exec.Command("pkill", "-9", artifactId).Run()
+			if err != nil {
+				log.Debug(err)
+			}
 		}
 
 		stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
