@@ -1,6 +1,6 @@
 module github.com/cantara/buri
 
-go 1.17
+go 1.20
 
 require (
 	github.com/cantara/bragi v0.6.3
