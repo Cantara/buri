@@ -265,7 +265,7 @@ func main() {
 	}
 	// Create the file
 
-	fileName := fmt.Sprintf("%s-%s", artifactId, newestP.version)
+	fileName := fmt.Sprintf("%s-%s", linkName, newestP.version)
 	if packageType == "go" {
 		fileName = fmt.Sprintf("%s-%s-%s", fileName, runtime.GOOS, runtime.GOARCH)
 	}
@@ -307,7 +307,6 @@ func downloadFile(path, fileName string) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-
 		log.Fatal("there is no version for ", runtime.GOOS, " ", runtime.GOARCH)
 	}
 
