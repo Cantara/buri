@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/joho/godotenv"
 	"io"
 	"io/fs"
 	"net/http"
@@ -144,9 +145,21 @@ func main() {
 		} else {
 			cmd = exec.Command(command[0], command[1:]...)
 		}
-		log.Debug(cmd)
+		var envMap map[string]string
+		envMap, err = godotenv.Read(".env."+linkName, linkName+".env")
+		if err != nil {
+			log.AddError(err).Info("while reading env files")
+		}
+		env := make([]string, len(envMap))
+		i := 0
+		for k, v := range envMap {
+			env[i] = fmt.Sprintf("%s=%s", k, v)
+			i++
+		}
+		cmd.Env = append(cmd.Environ(), env...)
 		cmd.Stdout = stdOut
 		cmd.Stderr = stdErr
+		log.Debug(cmd)
 		err = cmd.Start()
 		if err != nil {
 			log.Fatal(err)
