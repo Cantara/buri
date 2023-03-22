@@ -1,9 +1,10 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"github.com/joho/godotenv"
+	"github.com/shirou/gopsutil/v3/process"
 	"io"
 	"io/fs"
 	"net/http"
@@ -16,6 +17,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/joho/godotenv"
 
 	log "github.com/cantara/bragi"
 )
@@ -105,31 +108,38 @@ func main() {
 		if packageType == "jar" {
 			command = []string{"java", "-jar", command[0]}
 		}
-		pgrepProg := linkName
-		if packageType == "jar" {
-			pgrepProg = "java"
-		}
-		cmd := exec.Command("pgrep", "-u", strconv.Itoa(os.Getuid()), fmt.Sprintf("'^%s$'", pgrepProg)) //Breaking compatibility with windows / probably
-		out, err := cmd.Output()
+		commandString := strings.Join(command, " ")
+
+		procs, err := process.Processes()
 		if err != nil {
-			log.Debug(err)
+			log.AddError(err).Fatal("while getting processes")
 		}
-		if !foundNewerVersion {
-			//cmd := exec.Command("ps", "h", "-C", ex)
-			if len(out) != 0 {
-				log.Debug(string(out), err)
+		for _, proc := range procs {
+			if uids, err := proc.Uids(); err != nil || int(uids[0]) != os.Getuid() {
+				continue
+			}
+			cmd, err := proc.Cmdline()
+			if err != nil {
+				log.AddError(err).Warning("while getting cmd")
+				continue
+			}
+			if cmd != commandString {
+				continue
+			}
+			log.Info(cmd)
+			if !foundNewerVersion {
 				return
 			}
-		}
-		if false { //TODO: FIND OUT WHY EVERYTHING IS GETTING KILLED AND REMOVE ME
-			err = exec.Command("pkill", "-9", "-P", strings.ReplaceAll(string(out), "\n", ",")).Run()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+			err = proc.TerminateWithContext(ctx)
+			cancel()
 			if err != nil {
-				log.Debug(err)
+				err = proc.Kill()
+				if err != nil {
+					log.AddError(err).Error("while terminating service", "cmd", cmd)
+				}
 			}
-			err = exec.Command("pkill", "-9", artifactId).Run()
-			if err != nil {
-				log.Debug(err)
-			}
+			break
 		}
 
 		stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
@@ -140,6 +150,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		var cmd *exec.Cmd
 		if len(command) == 1 {
 			cmd = exec.Command(command[0])
 		} else {
