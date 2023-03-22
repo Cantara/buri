@@ -96,7 +96,7 @@ func main() {
 		linkName = fmt.Sprintf("%s-%s", linkName, strings.Join(subArtifact[1:], "-"))
 	}
 
-	err = godotenv.Load(fmt.Sprintf(".env.%s", linkName))
+	err = godotenv.Load(fmt.Sprintf(".env.buri.%s", linkName))
 	if err != nil {
 		log.AddError(err).Info("while reading env for ", linkName)
 	}
@@ -162,7 +162,7 @@ func main() {
 			cmd = exec.Command(command[0], command[1:]...)
 		}
 		var envMap map[string]string
-		envMap, err = godotenv.Read(".env."+linkName, linkName+".env")
+		envMap, err = godotenv.Read(".env."+strings.TrimSuffix(linkName, ".jar"), strings.TrimSuffix(linkName, ".jar")+".env")
 		if err != nil {
 			log.AddError(err).Info("while reading env files")
 		}
