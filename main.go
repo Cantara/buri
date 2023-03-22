@@ -105,11 +105,11 @@ func main() {
 		if packageType == "jar" {
 			command = []string{"java", "-jar", command[0]}
 		}
-		pgrepProg := artifactId
+		pgrepProg := linkName
 		if packageType == "jar" {
 			pgrepProg = "java"
 		}
-		cmd := exec.Command("pgrep", "-u", strconv.Itoa(os.Getuid()), pgrepProg) //Breaking compatibility with windows / probably
+		cmd := exec.Command("pgrep", "-u", strconv.Itoa(os.Getuid()), fmt.Sprintf("'^%s$'", pgrepProg)) //Breaking compatibility with windows / probably
 		out, err := cmd.Output()
 		if err != nil {
 			log.Debug(err)
