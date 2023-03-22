@@ -92,18 +92,18 @@ func main() {
 	fileSystem := os.DirFS(wd)
 
 	linkName := artifactId
-	if packageType == "jar" {
-		linkName = fmt.Sprintf("%s.jar", linkName)
-	}
 	if len(subArtifact) > 1 {
-		linkName = fmt.Sprintf("%s-%s", artifactId, strings.Join(subArtifact[1:], "-"))
+		linkName = fmt.Sprintf("%s-%s", linkName, strings.Join(subArtifact[1:], "-"))
 	}
 
-	err = godotenv.Load(fmt.Sprintf(".env.%s", strings.TrimSuffix(linkName, ".jar")))
+	err = godotenv.Load(fmt.Sprintf(".env.%s", linkName))
 	if err != nil {
 		log.AddError(err).Info("while reading env for ", linkName)
 	}
 
+	if packageType == "jar" {
+		linkName = fmt.Sprintf("%s.jar", linkName)
+	}
 	foundNewerVersion := false
 	defer func() {
 		if !shouldRun && !onlyKeepAlive {
