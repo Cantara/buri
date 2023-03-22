@@ -3,7 +3,7 @@ module github.com/cantara/buri
 go 1.20
 
 require (
-	github.com/cantara/bragi v0.6.3
+	github.com/cantara/bragi v0.6.7
 	github.com/joho/godotenv v1.5.1
 	github.com/shirou/gopsutil/v3 v3.23.2
 )
