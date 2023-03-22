@@ -99,6 +99,11 @@ func main() {
 		linkName = fmt.Sprintf("%s-%s", artifactId, strings.Join(subArtifact[1:], "-"))
 	}
 
+	err = godotenv.Load(fmt.Sprintf(".env.%s", linkName))
+	if err != nil {
+		log.AddError(err).Info("while reading env for ", linkName)
+	}
+
 	foundNewerVersion := false
 	defer func() {
 		if !shouldRun && !onlyKeepAlive {
@@ -395,7 +400,15 @@ func isSemanticNewer(filter string, p1, p2 string) bool {
 }
 
 func getParamsURL(regEx, url string) (params []string) {
-	resp, err := http.Get(url)
+	c := http.Client{}
+	r, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		log.AddError(err).Fatal("while creating new request")
+	}
+	if os.Getenv("username") != "" {
+		r.SetBasicAuth(os.Getenv("username"), os.Getenv("password"))
+	}
+	resp, err := c.Do(r)
 	if err != nil {
 		log.Fatal(err)
 	}
