@@ -99,7 +99,7 @@ func main() {
 		linkName = fmt.Sprintf("%s-%s", artifactId, strings.Join(subArtifact[1:], "-"))
 	}
 
-	err = godotenv.Load(fmt.Sprintf(".env.%s", linkName))
+	err = godotenv.Load(fmt.Sprintf(".env.%s", strings.TrimSuffix(linkName, ".jar")))
 	if err != nil {
 		log.AddError(err).Info("while reading env for ", linkName)
 	}
