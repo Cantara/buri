@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/tar"
+	"compress/gzip"
 	"context"
 	"flag"
 	"fmt"
@@ -312,6 +314,9 @@ func main() {
 	if packageType == "jar" {
 		fileName = fmt.Sprintf("%s.jar", fileName)
 	}
+	if packageType == "tgz" {
+		fileName = fmt.Sprintf("%s.tgz", fileName)
+	}
 	var path string
 	if len(subArtifact) == 1 {
 		path = newestP.path
@@ -325,12 +330,21 @@ func main() {
 	if packageType == "jar" {
 		path = fmt.Sprintf("%s.jar", path)
 	}
+	if packageType == "tgz" {
+		path = fmt.Sprintf("%s.tgz", path)
+	}
 	downloadFile(path, fileName)
 	if removeLink {
 		err = os.Remove(linkName)
 		if err != nil {
 			log.Fatal(err)
 		}
+	}
+	if packageType == "tgz" {
+		unpackTGZ(fileName)
+		os.Remove(fileName)
+		fileName = strings.TrimSuffix(fileName, ".tgz")
+		linkName = strings.TrimSuffix(linkName, ".tgz")
 	}
 	err = os.Symlink(fileName, linkName)
 	if err != nil {
@@ -387,7 +401,7 @@ func isSemanticNewer(filter string, p1, p2 string) bool {
 	} else if len(p1v) == 2 {
 		p1v = append(p1v, "0")
 	} else if len(p1v) > 3 {
-		log.Fatal("Invalid semantic version for arg 2, expecting v*.*.*")
+		log.Fatal("Invalid semantic version for arg 2, expecting v*.*.* ", p1v)
 	}
 	p2v := strings.Split(p2, ".")
 	if len(p2v) == 1 {
@@ -453,4 +467,62 @@ func getParams(regEx, data string) (params []string) {
 		}
 	}
 	return
+}
+
+func unpackTGZ(srcFile string) {
+	base := strings.TrimSuffix(srcFile, ".tgz")
+	os.Mkdir(base, 0750)
+	f, err := os.Open(srcFile)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
+	gzf, err := gzip.NewReader(f)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	tarReader := tar.NewReader(gzf)
+	// defer io.Copy(os.Stdout, tarReader)
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			panic(err)
+		}
+
+		name := header.Name
+		fmt.Println(name)
+
+		switch header.Typeflag {
+		case tar.TypeDir: // = directory
+			fmt.Println("Directory:", name)
+			os.Mkdir(fmt.Sprintf("%s/%s", base, name), 0750)
+		case tar.TypeReg: // = regular file
+			fmt.Println("Regular file:", name)
+			data := make([]byte, header.Size)
+
+			_, err := tarReader.Read(data)
+
+			if err != nil {
+				log.AddError(err).Error("while reading file ", name)
+			}
+
+			os.WriteFile(fmt.Sprintf("%s/%s", base, name), data, 0640)
+		default:
+			fmt.Printf("%s : %c %s %s\n",
+				"Yikes! Unable to figure out type",
+				header.Typeflag,
+				"in file",
+				name,
+			)
+		}
+	}
 }
