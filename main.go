@@ -244,8 +244,8 @@ func main() {
 	})
 	defer func() {
 		for i := 0; i < len(versionsOnSystem)-numVersionsToKeep; i++ {
-			err = os.Remove(versionsOnSystem[i].path)
-			log.AddError(err).Info("removing ", versionsOnSystem[i].path)
+			err = os.RemoveAll(versionsOnSystem[i].path)
+			log.AddError(err).Info("while removing ", versionsOnSystem[i].path)
 		}
 	}()
 
@@ -253,10 +253,11 @@ func main() {
 	params := getParamsURL("<td>(.+)</td>", url)
 	log.Debug(params)
 	var programs []program
-	for i := 1; i+1 < len(params); i += 2 {
+	for i := 1; i+1 < len(params); i++ {
 		urlPars := getParams("<a href=\"(.+)\">(.+)</a>", params[i])
 		if len(urlPars) != 2 {
-			log.Fatal("Wrong number of urls in path to version")
+			//log.Fatal("Wrong number of urls in path to version")
+			continue
 		}
 		if !strings.HasSuffix(urlPars[0], "/") {
 			continue

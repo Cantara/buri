@@ -1,0 +1,2 @@
+cd greps && ~/buri -t tgz -a items -g com.greps.items -u https://nexus.greps.dev/service/rest/repository/browse/maven-releases
+./buri -t jar -a jcat-server -g com.greps.jcat -u https://nexus.greps.dev/service/rest/repository/browse/maven-releases -r
