@@ -256,21 +256,32 @@ func main() {
 		if len(urlPars) != 2 {
 			log.Fatal("Wrong number of urls in path to version")
 		}
-		if !strings.HasSuffix(urlPars[1], "/") {
+		if !strings.HasSuffix(urlPars[0], "/") {
 			continue
 		}
 		if packageType == "go" && !strings.HasPrefix(urlPars[1], "v") { //Could be removed if you don't want go specific selection
 			continue
 		}
-		t, err := time.Parse("Mon Jan 02 15:04:05 MST 2006", params[i+1])
-		if err != nil {
-			log.Fatal(err)
+		log.Println(urlPars)
+		/*
+			t, err := time.Parse("Mon Jan 02 15:04:05 MST 2006", params[i+1])
+			if err != nil {
+				log.Fatal(err)
+			}
+		*/
+		var path string
+		if strings.HasPrefix(urlPars[0], "http") {
+			path = urlPars[0]
+		} else {
+			path = fmt.Sprintf("%s/%s", strings.TrimSuffix(strings.ReplaceAll(url, "service/rest/repository/browse/", "repository/"),
+				"/"), strings.TrimPrefix(urlPars[0], "/"))
 		}
 		programs = append(programs, program{
-			path:        urlPars[0],
-			version:     urlPars[1][:len(urlPars[1])-1],
-			updatedTime: t,
+			path:    path,
+			version: strings.TrimSuffix(urlPars[1], "/"),
+			//updatedTime: t,
 		})
+		log.Println(programs)
 	}
 	var newestP *program
 	for i, p := range programs {
@@ -294,7 +305,7 @@ func main() {
 	}
 	// Create the file
 
-	fileName := fmt.Sprintf("%s-%s", linkName, newestP.version)
+	fileName := fmt.Sprintf("%s-%s", strings.TrimSuffix(linkName, ".jar"), newestP.version)
 	if packageType == "go" {
 		fileName = fmt.Sprintf("%s-%s-%s", fileName, runtime.GOOS, runtime.GOARCH)
 	}
@@ -330,7 +341,15 @@ func main() {
 func downloadFile(path, fileName string) {
 	log.Info("Downloading new version, ", fileName, "\n", path)
 	// Get the data
-	resp, err := http.Get(path)
+	c := http.Client{}
+	r, err := http.NewRequest("GET", path, nil)
+	if err != nil {
+		log.AddError(err).Fatal("while creating new request")
+	}
+	if os.Getenv("username") != "" {
+		r.SetBasicAuth(os.Getenv("username"), os.Getenv("password"))
+	}
+	resp, err := c.Do(r)
 	if err != nil {
 		log.Fatal(err)
 	}
