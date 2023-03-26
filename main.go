@@ -470,60 +470,52 @@ func getParams(regEx, data string) (params []string) {
 	return
 }
 
-func unpackTGZ(srcFile string) {
+func unpackTGZ(srcFile string) (err error) {
 	base := strings.TrimSuffix(srcFile, ".tgz")
 	os.Mkdir(base, 0750)
-	f, err := os.Open(srcFile)
+	tgz, err := os.Open(srcFile)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return
 	}
-	defer f.Close()
+	defer tgz.Close()
 
-	gzf, err := gzip.NewReader(f)
+	gzf, err := gzip.NewReader(tgz)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return
 	}
 
 	tarReader := tar.NewReader(gzf)
-	// defer io.Copy(os.Stdout, tarReader)
-
 	for {
 		header, err := tarReader.Next()
-		if err == io.EOF {
-			break
-		}
-
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		name := header.Name
 		fmt.Println(name)
 
 		switch header.Typeflag {
-		case tar.TypeDir: // = directory
+		case tar.TypeDir:
 			fmt.Println("Directory:", name)
 			os.Mkdir(fmt.Sprintf("%s/%s", base, name), 0750)
-		case tar.TypeReg: // = regular file
+		case tar.TypeReg:
 			fmt.Println("Regular file:", name)
-			data := make([]byte, header.Size)
-
-			_, err := tarReader.Read(data)
-
-			if err != nil {
-				log.AddError(err).Error("while reading file ", name)
-			}
-
-			os.WriteFile(fmt.Sprintf("%s/%s", base, name), data, 0640)
+			func() {
+				fn := fmt.Sprintf("%s/%s", base, name)
+				f, err := os.OpenFile(fn, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
+				if err != nil {
+					log.AddError(err).Error("while opening file, ", name)
+					return
+				}
+				defer f.Close()
+				_, err = io.Copy(f, tarReader)
+				if err != nil {
+					log.AddError(err).Error("while reading file ", name)
+					return
+				}
+			}()
 		default:
-			fmt.Printf("%s : %c %s %s\n",
-				"Yikes! Unable to figure out type",
-				header.Typeflag,
-				"in file",
-				name,
-			)
+			log.Warning("not a known file type, ", name, ", ", header.Typeflag)
 		}
 	}
 }
