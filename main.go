@@ -502,7 +502,7 @@ func unpackTGZ(srcFile string) (err error) {
 			fmt.Println("Regular file:", name)
 			func() {
 				fn := fmt.Sprintf("%s/%s", base, name)
-				f, err := os.OpenFile(fn, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0640)
+				f, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
 				if err != nil {
 					log.AddError(err).Error("while opening file, ", name)
 					return
