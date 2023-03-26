@@ -38,6 +38,7 @@ var artifactId string
 var versionFilter string
 var shouldRun bool
 var numVersionsToKeep int
+var kill bool
 var onlyKeepAlive bool
 var packageType string
 
@@ -51,6 +52,7 @@ func init() {
 		versionsToKeepHelpText = "Number of `versions` to keep in directory as backup"
 		onlyKeepAliveHelpText  = "Makes it so buri only keeps the program running"
 		packageTypeHelpText    = "Defines what type of service to work with"
+		killHelpText           = "kills the specified program rather than downloading and running it"
 		helpText               = "Display help info"
 	)
 
@@ -62,6 +64,7 @@ func init() {
 	flag.StringVar(&versionFilter, "f", "*.*.*", versionFilterHelpText)
 	flag.BoolVar(&shouldRun, "r", false, shouldRunHelpText)
 	flag.IntVar(&numVersionsToKeep, "k", 4, versionsToKeepHelpText)
+	flag.BoolVar(&kill, "kill", false, killHelpText)
 	flag.BoolVar(&onlyKeepAlive, "o", false, onlyKeepAliveHelpText)
 	flag.StringVar(&packageType, "t", "go", packageTypeHelpText)
 }
@@ -81,6 +84,10 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
+	hd, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal(err)
+	}
 	groupId = strings.ReplaceAll(groupId, ".", "/")
 	log.SetLevel(log.DEBUG)
 
@@ -98,55 +105,38 @@ func main() {
 		linkName = fmt.Sprintf("%s-%s", linkName, strings.Join(subArtifact[1:], "-"))
 	}
 
-	err = godotenv.Load(fmt.Sprintf(".env.buri.%s", linkName))
-	if err != nil {
-		log.AddError(err).Info("while reading env for ", linkName)
+	if shouldRun {
+		os.Mkdir(hd+"/scripts", 0750)
+		os.WriteFile(fmt.Sprintf("%s/scripts/restart_%s.sh", hd, linkName), []byte(fmt.Sprintf(`#!/bin/sh
+#This script is managed by BURI https://github.com/cantara/buri
+~/scripts/stop_%[1]s.sh
+~/scripts/start_%[1]s.sh`, linkName)), 0750)
 	}
 
 	if packageType == "jar" {
 		linkName = fmt.Sprintf("%s.jar", linkName)
+	}
+
+	command := []string{fmt.Sprintf("%s/%s", wd, linkName)}
+	if packageType == "jar" {
+		command = []string{"java", "-jar", command[0]}
+	}
+	if kill {
+		killService(command)
+		return
+	}
+
+	err = godotenv.Load(fmt.Sprintf(".env.buri.%s", strings.TrimSuffix(linkName, ".jar")))
+	if err != nil {
+		log.AddError(err).Info("while reading env for ", linkName)
 	}
 	foundNewerVersion := false
 	defer func() {
 		if !shouldRun && !onlyKeepAlive {
 			return
 		}
-		command := []string{fmt.Sprintf("%s/%s", wd, linkName)}
-		if packageType == "jar" {
-			command = []string{"java", "-jar", command[0]}
-		}
-		commandString := strings.Join(command, " ")
-
-		procs, err := process.Processes()
-		if err != nil {
-			log.AddError(err).Fatal("while getting processes")
-		}
-		for _, proc := range procs {
-			if uids, err := proc.Uids(); err != nil || int(uids[0]) != os.Getuid() {
-				continue
-			}
-			cmd, err := proc.Cmdline()
-			if err != nil {
-				log.AddError(err).Warning("while getting cmd")
-				continue
-			}
-			if cmd != commandString {
-				continue
-			}
-			log.Info(cmd)
-			if !foundNewerVersion {
-				return
-			}
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-			err = proc.TerminateWithContext(ctx)
-			cancel()
-			if err != nil {
-				err = proc.Kill()
-				if err != nil {
-					log.AddError(err).Error("while terminating service", "cmd", cmd)
-				}
-			}
-			break
+		if foundNewerVersion {
+			killService(command)
 		}
 
 		stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
@@ -182,6 +172,12 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
+		os.WriteFile(fmt.Sprintf("%s/scripts/start_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
+#This script is managed by BURI https://github.com/cantara/buri
+%s`, strings.Join(os.Args, " "))), 0750)
+		os.WriteFile(fmt.Sprintf("%s/scripts/stop_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
+#This script is managed by BURI https://github.com/cantara/buri
+%s -kill`, strings.Join(os.Args, " "))), 0750)
 	}()
 
 	if onlyKeepAlive {
@@ -518,4 +514,38 @@ func unpackTGZ(srcFile string) (err error) {
 			log.Warning("not a known file type, ", name, ", ", header.Typeflag)
 		}
 	}
+}
+
+func killService(command []string) {
+	commandString := strings.Join(command, " ")
+
+	procs, err := process.Processes()
+	if err != nil {
+		log.AddError(err).Fatal("while getting processes")
+	}
+	for _, proc := range procs {
+		if uids, err := proc.Uids(); err != nil || int(uids[0]) != os.Getuid() {
+			continue
+		}
+		cmd, err := proc.Cmdline()
+		if err != nil {
+			log.AddError(err).Warning("while getting cmd")
+			continue
+		}
+		if cmd != commandString {
+			continue
+		}
+		log.Info(cmd)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		err = proc.TerminateWithContext(ctx)
+		cancel()
+		if err != nil {
+			err = proc.Kill()
+			if err != nil {
+				log.AddError(err).Error("while terminating service", "cmd", cmd)
+			}
+		}
+		break
+	}
+	return
 }
