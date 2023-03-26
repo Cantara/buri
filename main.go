@@ -110,7 +110,8 @@ func main() {
 		os.WriteFile(fmt.Sprintf("%s/scripts/restart_%s.sh", hd, linkName), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
 ~/scripts/kill_%[1]s.sh
-~/scripts/start_%[1]s.sh`, linkName)), 0750)
+~/scripts/start_%[1]s.sh
+`, linkName)), 0750)
 	}
 
 	if packageType == "jar" {
@@ -174,10 +175,12 @@ func main() {
 		}
 		os.WriteFile(fmt.Sprintf("%s/scripts/start_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
-%s > /dev/null`, strings.Join(os.Args, " "))), 0750)
+%s > /dev/null
+`, strings.Join(os.Args, " "))), 0750)
 		os.WriteFile(fmt.Sprintf("%s/scripts/kill_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
-%s -kill > /dev/null`, strings.Join(os.Args, " "))), 0750)
+%s -kill > /dev/null
+`, strings.Join(os.Args, " "))), 0750)
 	}()
 
 	if onlyKeepAlive {
