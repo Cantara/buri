@@ -138,6 +138,8 @@ func main() {
 		}
 		if foundNewerVersion {
 			killService(command)
+		} else if isRunning(command) {
+			return
 		}
 
 		stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
@@ -519,7 +521,7 @@ func unpackTGZ(srcFile string) (err error) {
 	}
 }
 
-func killService(command []string) {
+func killService(command []string) (killed bool) {
 	commandString := strings.Join(command, " ")
 
 	procs, err := process.Processes()
@@ -538,6 +540,7 @@ func killService(command []string) {
 		if cmd != commandString {
 			continue
 		}
+		killed = true
 		log.Info(cmd)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 		err = proc.TerminateWithContext(ctx)
@@ -548,6 +551,31 @@ func killService(command []string) {
 				log.AddError(err).Error("while terminating service", "cmd", cmd)
 			}
 		}
+		break
+	}
+	return
+}
+
+func isRunning(command []string) (running bool) {
+	commandString := strings.Join(command, " ")
+
+	procs, err := process.Processes()
+	if err != nil {
+		log.AddError(err).Fatal("while getting processes")
+	}
+	for _, proc := range procs {
+		if uids, err := proc.Uids(); err != nil || int(uids[0]) != os.Getuid() {
+			continue
+		}
+		cmd, err := proc.Cmdline()
+		if err != nil {
+			log.AddError(err).Warning("while getting cmd")
+			continue
+		}
+		if cmd != commandString {
+			continue
+		}
+		running = true
 		break
 	}
 	return
