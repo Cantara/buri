@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/tar"
+	"archive/zip"
 	"compress/gzip"
 	"context"
 	"flag"
@@ -51,7 +52,7 @@ func init() {
 		shouldRunHelpText      = "Should execute the downloaded program if it is not running or if it is downloaded"
 		versionsToKeepHelpText = "Number of `versions` to keep in directory as backup"
 		onlyKeepAliveHelpText  = "Makes it so buri only keeps the program running"
-		packageTypeHelpText    = "Defines what type of service to work with"
+		packageTypeHelpText    = "Defines what type of service to work with (go, jar, tar, zip_jar)"
 		killHelpText           = "kills the specified program rather than downloading and running it"
 		helpText               = "Display help info"
 	)
@@ -110,6 +111,7 @@ func main() {
 		os.WriteFile(fmt.Sprintf("%s/scripts/restart_%s.sh", hd, linkName), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
 ~/scripts/kill_%[1]s.sh
+sleep 5
 ~/scripts/start_%[1]s.sh
 `, linkName)), 0750)
 	}
@@ -121,6 +123,9 @@ func main() {
 	command := []string{fmt.Sprintf("%s/%s", wd, linkName)}
 	if packageType == "jar" {
 		command = []string{"java", "-jar", command[0]}
+	}
+	if packageType == "zip_jar" {
+		command = []string{"java", "-jar", fmt.Sprintf("%[1]s/%[1]s.jar", linkName)}
 	}
 	if kill {
 		killService(command)
@@ -157,7 +162,7 @@ func main() {
 			cmd = exec.Command(command[0], command[1:]...)
 		}
 		var envMap map[string]string
-		envMap, err = godotenv.Read(".env."+strings.TrimSuffix(linkName, ".jar"), strings.TrimSuffix(linkName, ".jar")+".env")
+		envMap, err = godotenv.Read(".env." + strings.TrimSuffix(linkName, ".jar")) //, strings.TrimSuffix(linkName, ".jar")+".env")
 		if err != nil {
 			log.AddError(err).Info("while reading env files")
 		}
@@ -200,10 +205,7 @@ func main() {
 		if path == "." {
 			return nil
 		}
-		log.Debug(path)
-		if d.IsDir() {
-			return fs.SkipDir
-		}
+		log.Debug("path: ", path)
 		if path == linkName {
 			linkPath, err := os.Readlink(path)
 			if err != nil {
@@ -235,6 +237,9 @@ func main() {
 				path:    path,
 				version: vers,
 			})
+		}
+		if d.IsDir() {
+			return fs.SkipDir
 		}
 		return nil
 	})
@@ -309,16 +314,6 @@ func main() {
 	}
 	// Create the file
 
-	fileName := fmt.Sprintf("%s-%s", strings.TrimSuffix(linkName, ".jar"), newestP.version)
-	if packageType == "go" {
-		fileName = fmt.Sprintf("%s-%s-%s", fileName, runtime.GOOS, runtime.GOARCH)
-	}
-	if packageType == "jar" {
-		fileName = fmt.Sprintf("%s.jar", fileName)
-	}
-	if packageType == "tgz" {
-		fileName = fmt.Sprintf("%s.tgz", fileName)
-	}
 	var path string
 	if len(subArtifact) == 1 {
 		path = newestP.path
@@ -326,14 +321,21 @@ func main() {
 		path = fmt.Sprintf("%s/%s/", strings.TrimSuffix(newestP.path, "/"), strings.Join(subArtifact[1:], "/"))
 	}
 	path = fmt.Sprintf("%s%s-%s", path, artifactId, newestP.version)
-	if packageType == "go" {
+	fileName := fmt.Sprintf("%s-%s", strings.TrimSuffix(linkName, ".jar"), newestP.version)
+	switch strings.ToLower(packageType) {
+	case "go":
+		fileName = fmt.Sprintf("%s-%s-%s", fileName, runtime.GOOS, runtime.GOARCH)
 		path = fmt.Sprintf("%s-%s-%s", path, runtime.GOOS, runtime.GOARCH)
-	}
-	if packageType == "jar" {
+	case "jar":
+		fileName = fmt.Sprintf("%s.jar", fileName)
 		path = fmt.Sprintf("%s.jar", path)
-	}
-	if packageType == "tgz" {
+	case "tgz":
+		fileName = fmt.Sprintf("%s.tgz", fileName)
 		path = fmt.Sprintf("%s.tgz", path)
+	case "zip_jar":
+		fileName = fmt.Sprintf("%s.zip", fileName)
+		path = fmt.Sprintf("%s.zip", path)
+
 	}
 	downloadFile(path, fileName)
 	if removeLink {
@@ -347,6 +349,11 @@ func main() {
 		os.Remove(fileName)
 		fileName = strings.TrimSuffix(fileName, ".tgz")
 		linkName = strings.TrimSuffix(linkName, ".tgz")
+	} else if strings.HasPrefix(packageType, "zip") {
+		linkName = strings.TrimSuffix(linkName, ".zip")
+		unpackZip(fileName, linkName)
+		os.Remove(fileName)
+		fileName = strings.TrimSuffix(fileName, ".zip")
 	}
 	err = os.Symlink(fileName, linkName)
 	if err != nil {
@@ -519,6 +526,49 @@ func unpackTGZ(srcFile string) (err error) {
 			log.Warning("not a known file type, ", name, ", ", header.Typeflag)
 		}
 	}
+}
+
+func unpackZip(srcFile, linkName string) (err error) {
+	base := strings.TrimSuffix(srcFile, ".tgz")
+	os.Mkdir(base, 0750)
+	r, err := zip.OpenReader(srcFile)
+	if err != nil {
+		return
+	}
+	defer r.Close()
+	fn := filepath.Base(srcFile)
+	fn = strings.TrimSuffix(fn, filepath.Ext(fn))
+	for _, f := range r.File {
+		fmt.Printf("Contents of %s:\n", f.Name)
+		osFileName := filepath.Clean(fmt.Sprintf("%s/%s", fn, f.Name))
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(osFileName, 0750)
+			continue
+		}
+		func() {
+			zf, err := f.Open()
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer zf.Close()
+			df, err := os.OpenFile(osFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0640)
+			if err != nil {
+				log.Fatal(err)
+			}
+			written, err := io.Copy(df, zf)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if written != f.FileInfo().Size() {
+				log.Fatal("wrote less than file size")
+			}
+		}()
+	}
+	err = os.Symlink(fmt.Sprintf("%s.jar", fn), fmt.Sprintf("%s/%s.jar", fn, linkName))
+	if err != nil {
+		log.Fatal(err)
+	}
+	return
 }
 
 func killService(command []string) (killed bool) {
