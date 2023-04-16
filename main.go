@@ -116,16 +116,13 @@ sleep 5
 `, linkName)), 0750)
 	}
 
-	if packageType == "jar" {
+	if strings.HasSuffix(packageType, "jar") {
 		linkName = fmt.Sprintf("%s.jar", linkName)
 	}
 
 	command := []string{fmt.Sprintf("%s/%s", wd, linkName)}
-	if packageType == "jar" {
+	if strings.HasSuffix(packageType, "jar") {
 		command = []string{"java", "-jar", command[0]}
-	}
-	if packageType == "zip_jar" {
-		command = []string{"java", "-jar", fmt.Sprintf("%[1]s/%[1]s.jar", linkName)}
 	}
 	if kill {
 		killService(command)
@@ -354,6 +351,7 @@ sleep 5
 		unpackZip(fileName, linkName)
 		os.Remove(fileName)
 		fileName = strings.TrimSuffix(fileName, ".zip")
+		linkName = strings.TrimSuffix(linkName, ".jar")
 	}
 	err = os.Symlink(fileName, linkName)
 	if err != nil {
@@ -564,7 +562,7 @@ func unpackZip(srcFile, linkName string) (err error) {
 			}
 		}()
 	}
-	err = os.Symlink(fmt.Sprintf("%s.jar", fn), fmt.Sprintf("%s/%s.jar", fn, linkName))
+	err = os.Symlink(fmt.Sprintf("%[1]s/%[1]s.jar", fn), linkName)
 	if err != nil {
 		log.Fatal(err)
 	}
