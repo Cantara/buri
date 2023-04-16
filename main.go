@@ -212,7 +212,7 @@ sleep 5
 			fileName := strings.ReplaceAll(strings.ReplaceAll(filepath.Base(linkPath), "-"+runtime.GOOS, ""), "-"+runtime.GOARCH, "")
 			fileNameEls := strings.Split(fileName, "-")
 			runningVersion = fileNameEls[len(fileNameEls)-1]
-			if packageType == "jar" {
+			if strings.HasSuffix(packageType, "jar") { //should probably just do this allways
 				runningVersion = strings.TrimSuffix(runningVersion, ".jar")
 			}
 			removeLink = true
