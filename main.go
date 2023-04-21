@@ -212,7 +212,7 @@ sleep 5
 			fileName := strings.ReplaceAll(strings.ReplaceAll(filepath.Base(linkPath), "-"+runtime.GOOS, ""), "-"+runtime.GOARCH, "")
 			fileNameEls := strings.Split(fileName, "-")
 			runningVersion = fileNameEls[len(fileNameEls)-1]
-			if strings.HasSuffix(packageType, "jar") { //should probably just do this allways
+			if strings.HasSuffix(packageType, "jar") { //should probably just do this always
 				runningVersion = strings.TrimSuffix(runningVersion, ".jar")
 			}
 			removeLink = true
@@ -404,6 +404,7 @@ func isSemanticNewer(filter string, p1, p2 string) bool {
 	}
 	p1v := strings.Split(p1, ".")
 	if len(p1v) == 1 {
+
 		p1v = append(p1v, []string{"0", "0"}...)
 	} else if len(p1v) == 2 {
 		p1v = append(p1v, "0")
