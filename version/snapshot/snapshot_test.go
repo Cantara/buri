@@ -1,36 +1,9 @@
 package snapshot
 
 import (
+	"github.com/cantara/buri/version"
 	"testing"
 )
-
-func TestPatternToFilter(t *testing.T) {
-	pattern := "*.*.*"
-	filter, err := PatternToFilter(pattern)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if filter.Level != Free {
-		t.Fatal("filter level is not correct", "level", filter.Level)
-	}
-}
-
-func TestParseVersion(t *testing.T) {
-	vers := "1.1.1"
-	version, err := ParseVersion(vers)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version.Major != 1 {
-		t.Fatal("major version is wrong", "major", version.Major)
-	}
-	if version.Minor != 1 {
-		t.Fatal("minor version is wrong", "minor", version.Minor)
-	}
-	if version.Patch != 1 {
-		t.Fatal("patch version is wrong", "patch", version.Patch)
-	}
-}
 
 func TestParseSnapshotVersion(t *testing.T) {
 	vers := "0.16.5-20230418.055134-1"
@@ -72,7 +45,7 @@ func TestParseSnapshotVersion(t *testing.T) {
 
 func TestIsSemanticNewer(t *testing.T) {
 	pattern := "*.*.*"
-	filter, _ := PatternToFilter(pattern)
+	filter, _ := version.PatternToFilter(pattern)
 	v1, _ := ParseSnapshotVersion("2.1.9-20230409.123528-1")
 	v2, _ := ParseSnapshotVersion("2.1.9-20230409.141416-2")
 	newer, err := IsSemanticNewer(filter, v1, v1)
@@ -106,7 +79,7 @@ func TestIsSemanticNewer(t *testing.T) {
 }
 
 func TestGenerateSnapshotVersion(t *testing.T) {
-	vers := Version{
+	vers := version.Version{
 		Major: 1,
 		Minor: 5,
 		Patch: 2,

@@ -1,11 +1,9 @@
-package snapshot
+package version
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type FilterLevel int
@@ -15,11 +13,10 @@ func (fl FilterLevel) Locked(l FilterLevel) bool {
 }
 
 const (
-	Free     = FilterLevel(4)
-	Major    = FilterLevel(3)
-	Minor    = FilterLevel(2)
-	Patch    = FilterLevel(1)
-	Snapshot = FilterLevel(0)
+	Free  = FilterLevel(4)
+	Major = FilterLevel(3)
+	Minor = FilterLevel(2)
+	Patch = FilterLevel(1)
 )
 
 type Filter struct {
@@ -65,102 +62,50 @@ func PatternToFilter(pattern string) (filter Filter, err error) {
 	return
 }
 
-func IsSemanticNewer(filter Filter, v1, v2 SnapshotVersion) (newer bool, err error) {
+func IsSemanticNewer(filter Filter, v1, v2 Version) (newer bool, err error) {
 	if filter.Level.Locked(Major) {
-		if filter.Version.Major != v1.Version.Major {
+		if filter.Version.Major != v1.Major {
 			err = ErrVersionDoesNotMatchFilter
 			return
 		}
-		if filter.Version.Major != v2.Version.Major {
+		if filter.Version.Major != v2.Major {
 			err = ErrVersionDoesNotMatchFilter
 			return
 		}
 	}
 	if filter.Level.Locked(Minor) {
-		if filter.Version.Minor != v1.Version.Minor {
+		if filter.Version.Minor != v1.Minor {
 			err = ErrVersionDoesNotMatchFilter
 			return
 		}
-		if filter.Version.Minor != v2.Version.Minor {
+		if filter.Version.Minor != v2.Minor {
 			err = ErrVersionDoesNotMatchFilter
 			return
 		}
 	}
 	if filter.Level.Locked(Patch) {
-		if filter.Version.Patch != v1.Version.Patch {
+		if filter.Version.Patch != v1.Patch {
 			err = ErrVersionDoesNotMatchFilter
 			return
 		}
-		if filter.Version.Patch != v2.Version.Patch {
+		if filter.Version.Patch != v2.Patch {
 			err = ErrVersionDoesNotMatchFilter
 			return
 		}
 	}
-	if v1.Version.Major < v2.Version.Major {
+	if v1.Major < v2.Major {
 		newer = true
 		return
 	}
-	if v1.Version.Minor < v2.Version.Minor {
+	if v1.Minor < v2.Minor {
 		newer = true
 		return
 	}
-	if v1.Version.Patch < v2.Version.Patch {
-		newer = true
-		return
-	}
-	if v1.TimeStamp.Before(v2.TimeStamp) {
-		newer = true
-		return
-	}
-	if v1.Iteration < v2.Iteration {
+	if v1.Patch < v2.Patch {
 		newer = true
 		return
 	}
 	return
-}
-
-func ParseSnapshotVersion(s string) (sv SnapshotVersion, err error) {
-	parts := strings.Split(s, "-")
-	if len(parts) != 3 {
-		err = fmt.Errorf("err: %v, %s", ErrNotValidVersion, "snapshot version string did not have the correct format")
-		return
-	}
-	vers, err := ParseVersion(parts[0])
-	if err != nil {
-		err = fmt.Errorf("err: %v, %s", err, "while parsing version")
-		return
-	}
-	t, err := time.Parse("20060102.150405", parts[1])
-	if err != nil {
-		err = fmt.Errorf("err: %v, %s", err, "while parsing timestamp")
-		return
-	}
-	itr, err := strconv.Atoi(parts[2])
-	if err != nil {
-		err = fmt.Errorf("err: %v, %s", err, "while parsing version iteration")
-		return
-	}
-	sv = SnapshotVersion{
-		Version:   vers,
-		TimeStamp: t,
-		Iteration: itr,
-	}
-	return
-}
-
-func GenerateSnapshotVersion(cur Version, itr int) SnapshotVersion {
-	itr++
-	return SnapshotVersion{
-		Version:   cur,
-		TimeStamp: time.Now(),
-		Iteration: itr,
-	}
-}
-
-type SnapshotVersion struct {
-	Version   Version
-	TimeStamp time.Time
-	Iteration int
 }
 
 type Version struct {
