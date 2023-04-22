@@ -1,34 +1,28 @@
 package main
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"compress/gzip"
-	"context"
 	"flag"
 	"fmt"
-	"github.com/shirou/gopsutil/v3/process"
-	"io"
+	"github.com/cantara/buri/maven"
+	"github.com/cantara/buri/pack"
+	"github.com/cantara/buri/version"
 	"io/fs"
-	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
 
 	log "github.com/cantara/bragi"
+	"github.com/cantara/buri/exec"
 )
 
 type program struct {
 	path        string
-	version     string
+	version     version.Version
 	updatedTime time.Time
 }
 
@@ -77,14 +71,15 @@ func main() {
 		return
 	}
 	if !onlyKeepAlive && (repoUrl == "" || groupId == "" || artifactId == "" || versionFilter == "") {
-		fmt.Println("All the following values is required:\n url to repo, groupId, artifactId, semantic version filter\n")
+		fmt.Print("All the following values is required:\n url to repo, groupId, artifactId, semantic version filter\n\n")
 		flag.PrintDefaults()
 		return
 	} else if onlyKeepAlive && artifactId == "" {
-		fmt.Println("ArtifactId is required when running with only keep alive active\n")
+		fmt.Print("ArtifactId is required when running with only keep alive active\n\n")
 		flag.PrintDefaults()
 		return
 	}
+	filter, err := version.ParseFilter(versionFilter)
 	hd, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
@@ -125,7 +120,7 @@ sleep 5
 		command = []string{"java", "-jar", command[0]}
 	}
 	if kill {
-		killService(command)
+		exec.KillService(command)
 		return
 	}
 
@@ -139,44 +134,11 @@ sleep 5
 			return
 		}
 		if foundNewerVersion {
-			killService(command)
-		} else if isRunning(command) {
+			exec.KillService(command)
+		} else if exec.IsRunning(command) {
 			return
 		}
-
-		stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-		if err != nil {
-			log.Fatal(err)
-		}
-		stdErr, err := os.OpenFile(fmt.Sprintf("%s/%sErr", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-		if err != nil {
-			log.Fatal(err)
-		}
-		var cmd *exec.Cmd
-		if len(command) == 1 {
-			cmd = exec.Command(command[0])
-		} else {
-			cmd = exec.Command(command[0], command[1:]...)
-		}
-		var envMap map[string]string
-		envMap, err = godotenv.Read(".env." + strings.TrimSuffix(linkName, ".jar")) //, strings.TrimSuffix(linkName, ".jar")+".env")
-		if err != nil {
-			log.AddError(err).Info("while reading env files")
-		}
-		env := make([]string, len(envMap))
-		i := 0
-		for k, v := range envMap {
-			env[i] = fmt.Sprintf("%s=%s", k, v)
-			i++
-		}
-		cmd.Env = append(cmd.Environ(), env...)
-		cmd.Stdout = stdOut
-		cmd.Stderr = stdErr
-		log.Debug(cmd)
-		err = cmd.Start()
-		if err != nil {
-			log.Fatal(err)
-		}
+		exec.StartService(command, artifactId, linkName, wd)
 		os.WriteFile(fmt.Sprintf("%s/scripts/start_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
 %s > /dev/null
@@ -192,10 +154,12 @@ sleep 5
 	}
 	url := fmt.Sprintf("%s/%s/%s", repoUrl, groupId, artifactId)
 
-	runningVersion := "0.0.0"
-	if packageType == "go" {
-		runningVersion = "v" + runningVersion
-	}
+	var runningVersion version.Version
+	/*
+		if packageType == "go" {
+			runningVersion = "v" + runningVersion
+		}
+	*/
 	removeLink := false
 	var versionsOnSystem []program
 	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
@@ -211,10 +175,11 @@ sleep 5
 			}
 			fileName := strings.ReplaceAll(strings.ReplaceAll(filepath.Base(linkPath), "-"+runtime.GOOS, ""), "-"+runtime.GOARCH, "")
 			fileNameEls := strings.Split(fileName, "-")
-			runningVersion = fileNameEls[len(fileNameEls)-1]
+			runningVersionString := fileNameEls[len(fileNameEls)-1]
 			if strings.HasSuffix(packageType, "jar") { //should probably just do this always
-				runningVersion = strings.TrimSuffix(runningVersion, ".jar")
+				runningVersionString = strings.TrimSuffix(runningVersionString, ".jar")
 			}
+			runningVersion, err = version.ParseVersion(runningVersionString)
 			removeLink = true
 			return nil
 		}
@@ -225,10 +190,15 @@ sleep 5
 			name = strings.TrimSuffix(name, ".jar")
 			name = strings.ReplaceAll(name, "-"+runtime.GOOS, "")
 			name = strings.ReplaceAll(name, "-"+runtime.GOARCH, "")
-			vers := strings.ReplaceAll(name, linkName+"-", "")
-			if len(strings.Split(vers, "-")) > 1 {
-				log.Debug("skipping since it is probably a sub artifact: ", vers)
+			name = strings.ReplaceAll(name, "-SNAPSHOT", "")
+			versionString := strings.ReplaceAll(name, linkName+"-", "")
+			if len(strings.Split(versionString, "-")) > 1 {
+				log.Debug("skipping since it is probably a sub artifact: ", versionString)
 				return nil
+			}
+			vers, err := version.ParseVersion(versionString)
+			if err != nil {
+				return err
 			}
 			versionsOnSystem = append(versionsOnSystem, program{
 				path:    path,
@@ -243,7 +213,10 @@ sleep 5
 	log.Debug(versionsOnSystem)
 
 	sort.Slice(versionsOnSystem, func(i, j int) bool {
-		return isSemanticNewer("*.*.*", versionsOnSystem[i].version, versionsOnSystem[j].version) // Could also be dependent on our semantic version tactic
+		if filter.Snapshot {
+			return false //snapshot.IsStrictlySemanticNewer(filter, versionsOnSystem[i].version, versionsOnSystem[j].version)
+		}
+		return version.IsStrictlySemanticNewer(filter, versionsOnSystem[i].version, versionsOnSystem[j].version)
 	})
 	defer func() {
 		for i := 0; i < len(versionsOnSystem)-numVersionsToKeep; i++ {
@@ -252,12 +225,12 @@ sleep 5
 		}
 	}()
 
-	log.Debug(url)
-	params := getParamsURL("<td>(.+)</td>", url)
-	log.Debug(params)
+	//log.Debug(url)
+	params := maven.GetParamsURL("<td>(.+)</td>", url)
+	//log.Debug(params)
 	var programs []program
 	for i := 1; i+1 < len(params); i++ {
-		urlPars := getParams("<a href=\"(.+)\">(.+)</a>", params[i])
+		urlPars := maven.GetParams("<a href=\"(.+)\">(.+)</a>", params[i])
 		if len(urlPars) != 2 {
 			//log.Fatal("Wrong number of urls in path to version")
 			continue
@@ -268,7 +241,7 @@ sleep 5
 		if packageType == "go" && !strings.HasPrefix(urlPars[1], "v") { //Could be removed if you don't want go specific selection
 			continue
 		}
-		log.Println(urlPars)
+		//log.Println(urlPars)
 		/*
 			t, err := time.Parse("Mon Jan 02 15:04:05 MST 2006", params[i+1])
 			if err != nil {
@@ -282,12 +255,22 @@ sleep 5
 			path = fmt.Sprintf("%s/%s", strings.TrimSuffix(strings.ReplaceAll(url, "service/rest/repository/browse/", "repository/"),
 				"/"), strings.TrimPrefix(urlPars[0], "/"))
 		}
+		versionString := strings.TrimSuffix(urlPars[1], "/")
+		vers, err := version.ParseVersion(versionString)
+		if err != nil {
+			log.AddError(err).Error("while parsing version")
+			continue
+		}
+		if !filter.Matches(vers) {
+			continue
+		}
+
+		log.Println(vers)
 		programs = append(programs, program{
 			path:    path,
-			version: strings.TrimSuffix(urlPars[1], "/"),
+			version: vers,
 			//updatedTime: t,
 		})
-		log.Println(programs)
 	}
 	var newestP *program
 	for i, p := range programs {
@@ -295,7 +278,8 @@ sleep 5
 			newestP = &programs[i]
 			continue
 		}
-		if isSemanticNewer(versionFilter, newestP.version, p.version) {
+		log.Debug("testing", "filter", filter, "v1", newestP.version, "v2", p.version)
+		if version.IsStrictlySemanticNewer(filter, newestP.version, p.version) {
 			log.Debug("Was newer")
 			newestP = &programs[i]
 		}
@@ -304,7 +288,7 @@ sleep 5
 		log.Fatal("No version found")
 	}
 
-	foundNewerVersion = runningVersion == "" || isSemanticNewer(versionFilter, runningVersion, newestP.version)
+	foundNewerVersion = runningVersion == version.Version{} || version.IsStrictlySemanticNewer(filter, runningVersion, newestP.version)
 
 	if !foundNewerVersion {
 		return
@@ -334,7 +318,7 @@ sleep 5
 		path = fmt.Sprintf("%s.zip", path)
 
 	}
-	downloadFile(path, fileName)
+	maven.DownloadFile(path, fileName)
 	if removeLink {
 		err = os.Remove(linkName)
 		if err != nil {
@@ -342,13 +326,13 @@ sleep 5
 		}
 	}
 	if packageType == "tgz" {
-		unpackTGZ(fileName)
+		pack.UnTGZ(fileName)
 		os.Remove(fileName)
 		fileName = strings.TrimSuffix(fileName, ".tgz")
 		linkName = strings.TrimSuffix(linkName, ".tgz")
 	} else if strings.HasPrefix(packageType, "zip") {
 		linkName = strings.TrimSuffix(linkName, ".zip")
-		unpackZip(fileName, linkName)
+		pack.UnZip(fileName, linkName)
 		os.Remove(fileName)
 		fileName = strings.TrimSuffix(fileName, ".zip")
 		linkName = strings.TrimSuffix(linkName, ".jar")
@@ -357,275 +341,4 @@ sleep 5
 	if err != nil {
 		log.Fatal(err)
 	}
-}
-
-func downloadFile(path, fileName string) {
-	log.Info("Downloading new version, ", fileName, "\n", path)
-	// Get the data
-	c := http.Client{}
-	r, err := http.NewRequest("GET", path, nil)
-	if err != nil {
-		log.AddError(err).Fatal("while creating new request")
-	}
-	if os.Getenv("username") != "" {
-		r.SetBasicAuth(os.Getenv("username"), os.Getenv("password"))
-	}
-	resp, err := c.Do(r)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		log.Fatal("there is no version for ", runtime.GOOS, " ", runtime.GOARCH)
-	}
-
-	out, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer out.Close()
-
-	// Writer the body to file
-	_, err = io.Copy(out, resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func isSemanticNewer(filter string, p1, p2 string) bool {
-	log.Printf("Testing %s vs %s with filter %s\n", p1, p2, filter)
-	if packageType == "go" {
-		p1 = p1[1:]
-		p2 = p2[1:]
-	}
-	levels := strings.Split(filter, ".")
-	if len(levels) != 3 {
-		log.Fatal("Invalid semantic filter, expecting *.*.*")
-	}
-	p1v := strings.Split(p1, ".")
-	if len(p1v) == 1 {
-
-		p1v = append(p1v, []string{"0", "0"}...)
-	} else if len(p1v) == 2 {
-		p1v = append(p1v, "0")
-	} else if len(p1v) > 3 {
-		log.Fatal("Invalid semantic version for arg 2, expecting v*.*.* ", p1v)
-	}
-	p2v := strings.Split(p2, ".")
-	if len(p2v) == 1 {
-		p2v = append(p2v, []string{"0", "0"}...)
-	} else if len(p2v) == 2 {
-		p2v = append(p2v, "0")
-	} else if len(p2v) > 3 {
-		log.Fatal("Invalid semantic version for arg 3, expecting v*.*.*")
-	}
-	for i := 0; i < 3; i++ {
-		if levels[i] == "*" {
-			v1, err := strconv.Atoi(p1v[i])
-			if err != nil {
-				log.Fatal(err)
-			}
-			v2, err := strconv.Atoi(p2v[i])
-			if err != nil {
-				log.Fatal(err)
-			}
-			if v1 < v2 {
-				return true
-			}
-			if v1 > v2 {
-				return false
-			}
-		}
-	}
-	return false
-}
-
-func getParamsURL(regEx, url string) (params []string) {
-	c := http.Client{}
-	r, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		log.AddError(err).Fatal("while creating new request")
-	}
-	if os.Getenv("username") != "" {
-		r.SetBasicAuth(os.Getenv("username"), os.Getenv("password"))
-	}
-	resp, err := c.Do(r)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Fatal(err)
-	}
-	params = getParams(regEx, string(body))
-	return
-}
-func getParams(regEx, data string) (params []string) {
-	var compRegEx = regexp.MustCompile(regEx)
-	matches := compRegEx.FindAllStringSubmatch(data, -1)
-
-	for _, line := range matches {
-		for i, match := range line {
-			//log.Debug(match)
-			if i == 0 {
-				continue
-			}
-			params = append(params, match)
-		}
-	}
-	return
-}
-
-func unpackTGZ(srcFile string) (err error) {
-	base := strings.TrimSuffix(srcFile, ".tgz")
-	os.Mkdir(base, 0750)
-	tgz, err := os.Open(srcFile)
-	if err != nil {
-		return
-	}
-	defer tgz.Close()
-
-	gzf, err := gzip.NewReader(tgz)
-	if err != nil {
-		return
-	}
-
-	tarReader := tar.NewReader(gzf)
-	for {
-		header, err := tarReader.Next()
-		if err != nil {
-			return err
-		}
-
-		name := header.Name
-		fmt.Println(name)
-
-		switch header.Typeflag {
-		case tar.TypeDir:
-			fmt.Println("Directory:", name)
-			os.Mkdir(fmt.Sprintf("%s/%s", base, name), 0750)
-		case tar.TypeReg:
-			fmt.Println("Regular file:", name)
-			func() {
-				fn := fmt.Sprintf("%s/%s", base, name)
-				f, err := os.OpenFile(fn, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0640)
-				if err != nil {
-					log.AddError(err).Error("while opening file, ", name)
-					return
-				}
-				defer f.Close()
-				_, err = io.Copy(f, tarReader)
-				if err != nil {
-					log.AddError(err).Error("while reading file ", name)
-					return
-				}
-			}()
-		default:
-			log.Warning("not a known file type, ", name, ", ", header.Typeflag)
-		}
-	}
-}
-
-func unpackZip(srcFile, linkName string) (err error) {
-	base := strings.TrimSuffix(srcFile, ".tgz")
-	os.Mkdir(base, 0750)
-	r, err := zip.OpenReader(srcFile)
-	if err != nil {
-		return
-	}
-	defer r.Close()
-	fn := filepath.Base(srcFile)
-	fn = strings.TrimSuffix(fn, filepath.Ext(fn))
-	for _, f := range r.File {
-		fmt.Printf("Contents of %s:\n", f.Name)
-		osFileName := filepath.Clean(fmt.Sprintf("%s/%s", fn, f.Name))
-		if f.FileInfo().IsDir() {
-			os.MkdirAll(osFileName, 0750)
-			continue
-		}
-		func() {
-			zf, err := f.Open()
-			if err != nil {
-				log.Fatal(err)
-			}
-			defer zf.Close()
-			df, err := os.OpenFile(osFileName, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0640)
-			if err != nil {
-				log.Fatal(err)
-			}
-			written, err := io.Copy(df, zf)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if written != f.FileInfo().Size() {
-				log.Fatal("wrote less than file size")
-			}
-		}()
-	}
-	err = os.Symlink(fmt.Sprintf("%[1]s/%[1]s.jar", fn), linkName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return
-}
-
-func killService(command []string) (killed bool) {
-	commandString := strings.Join(command, " ")
-
-	procs, err := process.Processes()
-	if err != nil {
-		log.AddError(err).Fatal("while getting processes")
-	}
-	for _, proc := range procs {
-		if uids, err := proc.Uids(); err != nil || int(uids[0]) != os.Getuid() {
-			continue
-		}
-		cmd, err := proc.Cmdline()
-		if err != nil {
-			log.AddError(err).Warning("while getting cmd")
-			continue
-		}
-		if cmd != commandString {
-			continue
-		}
-		killed = true
-		log.Info(cmd)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		err = proc.TerminateWithContext(ctx)
-		cancel()
-		if err != nil {
-			err = proc.Kill()
-			if err != nil {
-				log.AddError(err).Error("while terminating service", "cmd", cmd)
-			}
-		}
-		break
-	}
-	return
-}
-
-func isRunning(command []string) (running bool) {
-	commandString := strings.Join(command, " ")
-
-	procs, err := process.Processes()
-	if err != nil {
-		log.AddError(err).Fatal("while getting processes")
-	}
-	for _, proc := range procs {
-		if uids, err := proc.Uids(); err != nil || int(uids[0]) != os.Getuid() {
-			continue
-		}
-		cmd, err := proc.Cmdline()
-		if err != nil {
-			log.AddError(err).Warning("while getting cmd")
-			continue
-		}
-		if cmd != commandString {
-			continue
-		}
-		running = true
-		break
-	}
-	return
 }

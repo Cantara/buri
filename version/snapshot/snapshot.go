@@ -25,6 +25,11 @@ func IsSemanticNewer(filter version.Filter, v1, v2 Version) (newer bool, err err
 	return
 }
 
+func IsStrictlySemanticNewer(filter version.Filter, v1, v2 Version) bool {
+	newer, err := IsSemanticNewer(filter, v1, v2)
+	return newer && err == nil
+}
+
 func ParseSnapshotVersion(s string) (sv Version, err error) {
 	parts := strings.Split(s, "-")
 	if len(parts) != 3 {

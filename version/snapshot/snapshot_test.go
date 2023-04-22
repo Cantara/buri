@@ -45,7 +45,7 @@ func TestParseSnapshotVersion(t *testing.T) {
 
 func TestIsSemanticNewer(t *testing.T) {
 	pattern := "*.*.*"
-	filter, _ := version.PatternToFilter(pattern)
+	filter, _ := version.ParseFilter(pattern)
 	v1, _ := ParseSnapshotVersion("2.1.9-20230409.123528-1")
 	v2, _ := ParseSnapshotVersion("2.1.9-20230409.141416-2")
 	newer, err := IsSemanticNewer(filter, v1, v1)

@@ -2,96 +2,19 @@ package version
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
 
-type FilterLevel int
-
-func (fl FilterLevel) Locked(l FilterLevel) bool {
-	return fl <= l
-}
-
-const (
-	Free  = FilterLevel(4)
-	Major = FilterLevel(3)
-	Minor = FilterLevel(2)
-	Patch = FilterLevel(1)
-)
-
-type Filter struct {
-	Level   FilterLevel
-	Version Version
-}
-
-func PatternToFilter(pattern string) (filter Filter, err error) {
-	parts := strings.Split(pattern, ".")
-	if len(parts) > 3 || len(parts) == 0 {
-		err = ErrNotValidPattern
+func IsSemanticNewer(filter Filter, v1, v2 Version) (newer bool, err error) {
+	if !filter.Matches(v1) {
+		err = ErrVersionDoesNotMatchFilter
 		return
 	}
-
-	versionSet := false
-	freeParts := 0
-	for i := len(parts) - 1; i >= 0; i-- {
-		if parts[i] == "*" {
-			freeParts++
-			if versionSet {
-				err = ErrNotValidPattern
-				return
-			}
-			continue
-		}
-		versionSet = true
-		var vers int
-		vers, err = strconv.Atoi(parts[i])
-		if err != nil {
-			err = errors.Join(err, ErrNotValidPattern)
-			return
-		}
-		switch i {
-		case 0:
-			filter.Version.Major = vers
-		case 1:
-			filter.Version.Minor = vers
-		case 2:
-			filter.Version.Patch = vers
-		}
-	}
-	filter.Level = FilterLevel(freeParts + 1)
-	return
-}
-
-func IsSemanticNewer(filter Filter, v1, v2 Version) (newer bool, err error) {
-	if filter.Level.Locked(Major) {
-		if filter.Version.Major != v1.Major {
-			err = ErrVersionDoesNotMatchFilter
-			return
-		}
-		if filter.Version.Major != v2.Major {
-			err = ErrVersionDoesNotMatchFilter
-			return
-		}
-	}
-	if filter.Level.Locked(Minor) {
-		if filter.Version.Minor != v1.Minor {
-			err = ErrVersionDoesNotMatchFilter
-			return
-		}
-		if filter.Version.Minor != v2.Minor {
-			err = ErrVersionDoesNotMatchFilter
-			return
-		}
-	}
-	if filter.Level.Locked(Patch) {
-		if filter.Version.Patch != v1.Patch {
-			err = ErrVersionDoesNotMatchFilter
-			return
-		}
-		if filter.Version.Patch != v2.Patch {
-			err = ErrVersionDoesNotMatchFilter
-			return
-		}
+	if !filter.Matches(v2) {
+		err = ErrVersionDoesNotMatchFilter
+		return
 	}
 	if v1.Major < v2.Major {
 		newer = true
@@ -108,14 +31,56 @@ func IsSemanticNewer(filter Filter, v1, v2 Version) (newer bool, err error) {
 	return
 }
 
+func IsStrictlySemanticNewer(filter Filter, v1, v2 Version) bool {
+	if !filter.Matches(v2) {
+		return false
+	}
+	if !filter.Matches(v1) {
+		return true
+	}
+	newer, err := IsSemanticNewer(filter, v1, v2)
+	return newer && err == nil
+}
+
+type Style int
+
+const (
+	GoStyle = Style(1)
+)
+
 type Version struct {
 	Major int
 	Minor int
 	Patch int
+	Style Style
+}
+
+func (v Version) String() string {
+	version := fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
+
+	switch v.Style {
+	case GoStyle:
+		return "v" + version
+	default:
+		return version
+	}
+}
+
+func (v Version) IsSemanticNewer(filter Filter, v2 Version) (newer bool, err error) {
+	return IsSemanticNewer(filter, v, v2)
+}
+
+func (v Version) IsStrictlySemanticNewer(filter Filter, v2 Version) bool {
+	newer, err := v.IsSemanticNewer(filter, v2)
+	return newer && err == nil
 }
 
 func ParseVersion(s string) (v Version, err error) {
-	s = strings.TrimPrefix(s, "v")
+	var style Style
+	if strings.HasPrefix(s, "v") {
+		style = GoStyle
+		s = strings.TrimPrefix(s, "v")
+	}
 	parts := strings.Split(s, ".")
 	if len(parts) != 3 {
 		err = ErrNotValidVersion
@@ -140,6 +105,7 @@ func ParseVersion(s string) (v Version, err error) {
 		Major: major,
 		Minor: minor,
 		Patch: patch,
+		Style: style,
 	}
 	return
 }

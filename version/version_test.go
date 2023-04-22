@@ -4,10 +4,10 @@ import (
 	"testing"
 )
 
-func TestPatternToFilter(t *testing.T) {
+func TestParseFilter(t *testing.T) {
 	{
 		pattern := "*.*.*"
-		filter, err := PatternToFilter(pattern)
+		filter, err := ParseFilter(pattern)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -17,7 +17,7 @@ func TestPatternToFilter(t *testing.T) {
 	}
 	{
 		pattern := "1.*.*"
-		filter, err := PatternToFilter(pattern)
+		filter, err := ParseFilter(pattern)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -27,14 +27,14 @@ func TestPatternToFilter(t *testing.T) {
 	}
 	{
 		pattern := "*.2.*"
-		_, err := PatternToFilter(pattern)
+		_, err := ParseFilter(pattern)
 		if err == nil {
 			t.Fatal("pattern should not be valid")
 		}
 	}
 	{
 		pattern := "1.2.*"
-		filter, err := PatternToFilter(pattern)
+		filter, err := ParseFilter(pattern)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -44,7 +44,7 @@ func TestPatternToFilter(t *testing.T) {
 	}
 	{
 		pattern := "1.2.5"
-		filter, err := PatternToFilter(pattern)
+		filter, err := ParseFilter(pattern)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -73,7 +73,7 @@ func TestParseVersion(t *testing.T) {
 
 func TestIsSemanticNewer(t *testing.T) {
 	pattern := "*.*.*"
-	filter, _ := PatternToFilter(pattern)
+	filter, _ := ParseFilter(pattern)
 	v1, _ := ParseVersion("2.1.9")
 	v2, _ := ParseVersion("2.1.10")
 	newer, err := IsSemanticNewer(filter, v1, v1)
@@ -108,7 +108,7 @@ func TestIsSemanticNewer(t *testing.T) {
 
 func TestIsSemanticNewerLockedMinor(t *testing.T) {
 	pattern := "2.1.*"
-	filter, _ := PatternToFilter(pattern)
+	filter, _ := ParseFilter(pattern)
 	v1, _ := ParseVersion("2.1.9")
 	v2, _ := ParseVersion("2.1.10")
 	newer, err := IsSemanticNewer(filter, v1, v1)
@@ -139,4 +139,36 @@ func TestIsSemanticNewerLockedMinor(t *testing.T) {
 	if !newer {
 		t.Fatal("version was not newer", "filter", filter, "v1", v1, "v2", v2)
 	}
+}
+
+func TestIsStrictlySemanticNewer(t *testing.T) {
+	pattern := "0.5.*"
+	filter, _ := ParseFilter(pattern)
+	v1, _ := ParseVersion("v0.6.34")
+	v2, _ := ParseVersion("v0.5.10")
+
+	newer := IsStrictlySemanticNewer(filter, v1, v1)
+	if newer {
+		t.Fatal("version was newer", "filter", filter, "v1", v1)
+	}
+	newer = IsStrictlySemanticNewer(filter, v2, v2)
+	if newer {
+		t.Fatal("version was newer", "filter", filter, "v2", v2)
+	}
+	newer = IsStrictlySemanticNewer(filter, v2, v1)
+	if newer {
+		t.Fatal("version was newer", "filter", filter, "v1", v1, "v2", v2)
+	}
+	newer = IsStrictlySemanticNewer(filter, v1, v2)
+	if !newer {
+		t.Fatal("version was not newer", "filter", filter, "v1", v1, "v2", v2)
+	}
+
+	v1, _ = ParseVersion("v0.1.0")
+	v2, _ = ParseVersion("v0.5.11")
+	newer = IsStrictlySemanticNewer(filter, v1, v2)
+	if !newer {
+		t.Fatal("version was not newer", "filter", filter, "v1", v1, "v2", v2)
+	}
+
 }
