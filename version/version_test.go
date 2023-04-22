@@ -5,13 +5,52 @@ import (
 )
 
 func TestPatternToFilter(t *testing.T) {
-	pattern := "*.*.*"
-	filter, err := PatternToFilter(pattern)
-	if err != nil {
-		t.Fatal(err)
+	{
+		pattern := "*.*.*"
+		filter, err := PatternToFilter(pattern)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if filter.Level != Free {
+			t.Fatal("filter level is not correct", "level", filter.Level)
+		}
 	}
-	if filter.Level != Free {
-		t.Fatal("filter level is not correct", "level", filter.Level)
+	{
+		pattern := "1.*.*"
+		filter, err := PatternToFilter(pattern)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if filter.Level != Major {
+			t.Fatal("filter level is not correct", "level", filter.Level)
+		}
+	}
+	{
+		pattern := "*.2.*"
+		_, err := PatternToFilter(pattern)
+		if err == nil {
+			t.Fatal("pattern should not be valid")
+		}
+	}
+	{
+		pattern := "1.2.*"
+		filter, err := PatternToFilter(pattern)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if filter.Level != Minor {
+			t.Fatal("filter level is not correct", "level", filter.Level)
+		}
+	}
+	{
+		pattern := "1.2.5"
+		filter, err := PatternToFilter(pattern)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if filter.Level != Patch {
+			t.Fatal("filter level is not correct", "level", filter.Level)
+		}
 	}
 }
 
@@ -40,6 +79,41 @@ func TestIsSemanticNewer(t *testing.T) {
 	newer, err := IsSemanticNewer(filter, v1, v1)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if newer {
+		t.Fatal("version was newer", "filter", filter, "v1", v1)
+	}
+	newer, err = IsSemanticNewer(filter, v2, v2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newer {
+		t.Fatal("version was newer", "filter", filter, "v2", v2)
+	}
+	newer, err = IsSemanticNewer(filter, v2, v1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if newer {
+		t.Fatal("version was newer", "filter", filter, "v1", v1, "v2", v2)
+	}
+	newer, err = IsSemanticNewer(filter, v1, v2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !newer {
+		t.Fatal("version was not newer", "filter", filter, "v1", v1, "v2", v2)
+	}
+}
+
+func TestIsSemanticNewerLockedMinor(t *testing.T) {
+	pattern := "2.1.*"
+	filter, _ := PatternToFilter(pattern)
+	v1, _ := ParseVersion("2.1.9")
+	v2, _ := ParseVersion("2.1.10")
+	newer, err := IsSemanticNewer(filter, v1, v1)
+	if err != nil {
+		t.Fatal(err, filter, v1, v2)
 	}
 	if newer {
 		t.Fatal("version was newer", "filter", filter, "v1", v1)

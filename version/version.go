@@ -50,11 +50,11 @@ func PatternToFilter(pattern string) (filter Filter, err error) {
 			return
 		}
 		switch i {
-		case 2:
+		case 0:
 			filter.Version.Major = vers
 		case 1:
 			filter.Version.Minor = vers
-		case 0:
+		case 2:
 			filter.Version.Patch = vers
 		}
 	}
