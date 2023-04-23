@@ -4,17 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"github.com/cantara/buri/pack"
-	"github.com/cantara/buri/readers"
 	"github.com/cantara/buri/readers/maven"
 	versionFilter "github.com/cantara/buri/version/filter"
-	"github.com/cantara/buri/version/release"
+	"github.com/cantara/buri/version/generic"
 	"github.com/joho/godotenv"
 	"os"
 	"runtime"
-	"sort"
 	"strings"
 
-	log "github.com/cantara/bragi"
+	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/exec"
 )
 
@@ -28,6 +26,7 @@ var numVersionsToKeep int
 var kill bool
 var onlyKeepAlive bool
 var packageType string
+var debug bool
 
 func init() {
 	const (
@@ -39,7 +38,8 @@ func init() {
 		versionsToKeepHelpText = "Number of `versions` to keep in directory as backup"
 		onlyKeepAliveHelpText  = "Makes it so buri only keeps the program running"
 		packageTypeHelpText    = "Defines what type of service to work with (go, jar, tar, zip_jar)"
-		killHelpText           = "kills the specified program rather than downloading and running it"
+		killHelpText           = "Kills the specified program rather than downloading and running it"
+		debugHelpText          = "Enables debug and trace logging"
 		helpText               = "Display help info"
 	)
 
@@ -54,6 +54,7 @@ func init() {
 	flag.BoolVar(&kill, "kill", false, killHelpText)
 	flag.BoolVar(&onlyKeepAlive, "o", false, onlyKeepAliveHelpText)
 	flag.StringVar(&packageType, "t", "go", packageTypeHelpText)
+	flag.BoolVar(&debug, "d", false, debugHelpText)
 }
 
 func main() {
@@ -71,20 +72,27 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
+	if debug {
+		nl, err := log.NewDebugLogger()
+		if err != nil {
+			log.WithError(err).Fatal("while creating new debug logger")
+		}
+		nl.SetDefault()
+	}
 	filter, err := versionFilter.Parse(filterString)
 	hd, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).Fatal("while getting home dir")
 	}
 	groupId = strings.ReplaceAll(groupId, ".", "/")
-	log.SetLevel(log.DEBUG)
+	//log.SetLevel(log.DEBUG)
 
 	subArtifact := strings.Split(artifactId, "/")
 	artifactId = subArtifact[0]
 
 	wd, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).Fatal("while getting working dir")
 	}
 
 	linkName := artifactId
@@ -117,19 +125,13 @@ sleep 5
 
 	err = godotenv.Load(fmt.Sprintf(".env.buri.%s", strings.TrimSuffix(linkName, ".jar")))
 	if err != nil {
-		log.AddError(err).Info("while reading env for ", linkName)
+		log.WithError(err).Info("while reading env", "name", linkName)
 	}
 	foundNewerVersion := false
 	defer func() {
 		if !shouldRun && !onlyKeepAlive {
 			return
 		}
-		if foundNewerVersion {
-			exec.KillService(command)
-		} else if exec.IsRunning(command) {
-			return
-		}
-		exec.StartService(command, artifactId, linkName, wd)
 		os.WriteFile(fmt.Sprintf("%s/scripts/start_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
 %s > /dev/null
@@ -138,13 +140,17 @@ sleep 5
 #This script is managed by BURI https://github.com/cantara/buri
 %s -kill > /dev/null
 `, strings.Join(os.Args, " "))), 0750)
+		if foundNewerVersion {
+			exec.KillService(command)
+		} else if exec.IsRunning(command) {
+			return
+		}
+		exec.StartService(command, artifactId, linkName, wd)
 	}()
 
 	if onlyKeepAlive {
 		return
 	}
-	url := fmt.Sprintf("%s/%s/%s", repoUrl, groupId, artifactId)
-
 	/*
 		var versionType Version[version.Base]
 		versionType = reflect.TypeOf(version.Base)
@@ -155,100 +161,27 @@ sleep 5
 			}
 	*/
 
-	disk := os.DirFS(wd)
-	versionsOnDisk, runningVersion, removeLink, err := readers.VersionOnDisk[release.Version](disk, filter, linkName, packageType)
-	//var runningVersion readers.Version[release.Version]
-	//removeLink := false
-	log.Debug(versionsOnDisk)
-
-	sort.Slice(versionsOnDisk, func(i, j int) bool {
-		return versionsOnDisk[i].Version.IsStrictlySemanticNewer(filter, versionsOnDisk[j].Version)
-	})
-	defer func() {
-		for i := 0; i < len(versionsOnDisk)-numVersionsToKeep; i++ {
-			err = os.RemoveAll(versionsOnDisk[i].Path)
-			log.AddError(err).Info("while removing ", versionsOnDisk[i].Path)
-		}
-	}()
-
-	//log.Debug(url)
-	params := maven.GetParamsURL("<td>(.+)</td>", url)
-	//log.Debug(params)
-	var programs []readers.Program[release.Version]
-	for i := 1; i+1 < len(params); i++ {
-		urlPars := maven.GetParams("<a href=\"(.+)\">(.+)</a>", params[i])
-		if len(urlPars) != 2 {
-			//log.Fatal("Wrong number of urls in path to version")
-			continue
-		}
-		if !strings.HasSuffix(urlPars[0], "/") {
-			continue
-		}
-		if packageType == "go" && !strings.HasPrefix(urlPars[1], "v") { //Could be removed if you don't want go specific selection
-			continue
-		}
-		//log.Println(urlPars)
-		/*
-			t, err := time.Parse("Mon Jan 02 15:04:05 MST 2006", params[i+1])
-			if err != nil {
-				log.Fatal(err)
-			}
-		*/
-		var path string
-		if strings.HasPrefix(urlPars[0], "http") {
-			path = urlPars[0]
-		} else {
-			path = fmt.Sprintf("%s/%s", strings.TrimSuffix(strings.ReplaceAll(url, "service/rest/repository/browse/", "repository/"),
-				"/"), strings.TrimPrefix(urlPars[0], "/"))
-		}
-		versionString := strings.TrimSuffix(urlPars[1], "/")
-		vers, err := release.Parse(versionString)
-		if err != nil {
-			log.AddError(err).Error("while parsing version")
-			continue
-		}
-		if !vers.Matches(filter) {
-			continue
-		}
-
-		log.Println(vers)
-		programs = append(programs, readers.Program[release.Version]{
-			Path:    path,
-			Version: vers,
-			//updatedTime: t,
-		})
+	diskFS := os.DirFS(wd)
+	mavenPath, mavenVersion, removeLink, err := generic.NewestVersion(diskFS, filter, groupId, artifactId, linkName, packageType, repoUrl, numVersionsToKeep)
+	if mavenVersion != "" {
+		log.Info("new version found", "version", mavenVersion)
+		foundNewerVersion = true
 	}
-	var newestP *readers.Program[release.Version]
-	for i, p := range programs {
-		if newestP == nil {
-			newestP = &programs[i]
-			continue
-		}
-		log.Debug("testing", "filter", filter, "v1", newestP.Version, "v2", p.Version)
-		if newestP.Version.IsStrictlySemanticNewer(filter, p.Version) {
-			log.Debug("Was newer")
-			newestP = &programs[i]
-		}
-	}
-	if newestP == nil {
-		log.Fatal("No version found")
-	}
-
-	foundNewerVersion = runningVersion.IsStrictlySemanticNewer(filter, newestP.Version)
 
 	if !foundNewerVersion {
+		log.Info("no new version found")
 		return
 	}
 	// Create the file
 
 	var path string
 	if len(subArtifact) == 1 {
-		path = newestP.Path
+		path = mavenPath
 	} else {
-		path = fmt.Sprintf("%s/%s/", strings.TrimSuffix(newestP.Path, "/"), strings.Join(subArtifact[1:], "/"))
+		path = fmt.Sprintf("%s/%s/", strings.TrimSuffix(mavenPath, "/"), strings.Join(subArtifact[1:], "/"))
 	}
-	path = fmt.Sprintf("%s%s-%s", path, artifactId, newestP.Version)
-	fileName := fmt.Sprintf("%s-%s", strings.TrimSuffix(linkName, ".jar"), newestP.Version)
+	path = fmt.Sprintf("%s%s-%s", path, artifactId, mavenVersion)
+	fileName := fmt.Sprintf("%s-%s", strings.TrimSuffix(linkName, ".jar"), mavenVersion)
 	switch strings.ToLower(packageType) {
 	case "go":
 		fileName = fmt.Sprintf("%s-%s-%s", fileName, runtime.GOOS, runtime.GOARCH)
@@ -268,7 +201,7 @@ sleep 5
 	if removeLink {
 		err = os.Remove(linkName)
 		if err != nil {
-			log.Fatal(err)
+			log.WithError(err).Fatal("while removing link")
 		}
 	}
 	if packageType == "tgz" {
@@ -285,6 +218,6 @@ sleep 5
 	}
 	err = os.Symlink(fileName, linkName)
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).Fatal("while sym linking")
 	}
 }

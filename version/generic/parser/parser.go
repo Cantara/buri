@@ -1,4 +1,4 @@
-package readers
+package parser
 
 import (
 	"github.com/cantara/buri/version"
@@ -7,7 +7,7 @@ import (
 	"github.com/cantara/buri/version/snapshot"
 )
 
-func ParseVersion(f filter.Filter, s string) (vers any, err error) {
+func Parse(f filter.Filter, s string) (vers any, err error) {
 	switch f.Type {
 	case snapshot.Type:
 		vers, err = snapshot.Parse(s)

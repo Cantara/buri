@@ -1,7 +1,7 @@
 package maven
 
 import (
-	log "github.com/cantara/bragi"
+	log "github.com/cantara/bragi/sbragi"
 	"io"
 	"net/http"
 	"os"
@@ -12,21 +12,22 @@ func GetParamsURL(regEx, url string) (params []string) {
 	c := http.Client{}
 	r, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.AddError(err).Fatal("while creating new request")
+		log.WithError(err).Fatal("while creating new request")
 	}
 	if os.Getenv("username") != "" {
 		r.SetBasicAuth(os.Getenv("username"), os.Getenv("password"))
 	}
 	resp, err := c.Do(r)
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).Fatal("while executing request to get param urls")
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).Fatal("while reading body from request getting param urls")
 	}
 	params = GetParams(regEx, string(body))
+	log.Debug("maven", "params", params)
 	return
 }
 

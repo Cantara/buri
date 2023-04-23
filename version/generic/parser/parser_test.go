@@ -1,4 +1,4 @@
-package readers
+package parser
 
 import (
 	"github.com/cantara/buri/version/filter"
@@ -9,7 +9,7 @@ import (
 
 func TestParseVersionRelease(t *testing.T) {
 	f, _ := filter.Parse("*.*.*")
-	vers, err := ParseVersion(f, "1.0.1")
+	vers, err := Parse(f, "1.0.1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestParseVersionRelease(t *testing.T) {
 
 func TestParseVersionSnapshot(t *testing.T) {
 	f, _ := filter.Parse("*.*.*-SNAPSHOT")
-	vers, err := ParseVersion(f, "2.1.9-20230409.123528-1")
+	vers, err := Parse(f, "2.1.9-20230409.123528-1")
 	if err != nil {
 		t.Fatal(err)
 	}

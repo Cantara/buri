@@ -13,6 +13,8 @@ type VersionType interface {
 type Version[T any] interface {
 	VersionType
 	IsStrictlySemanticNewer(f filter.Filter, v2 T) bool
+	Matches(f filter.Filter) bool
+	String() string
 }
 
 type Program[T Version[T]] struct {

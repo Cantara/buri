@@ -1,4 +1,4 @@
-package readers
+package disk
 
 import (
 	"github.com/cantara/buri/version/filter"
@@ -9,9 +9,9 @@ import (
 
 var disk = os.DirFS("test")
 
-func TestVersionOnDisk(t *testing.T) {
+func TestVersion(t *testing.T) {
 	f, _ := filter.Parse("*.*.*")
-	versionsOnDisk, runningVersion, removeLink, err := VersionOnDisk[release.Version](disk, f, "buri", "go")
+	versionsOnDisk, runningVersion, removeLink, err := Version[release.Version](disk, f, "buri", "go", 1)
 	if err != nil {
 		t.Fatal(err)
 	}

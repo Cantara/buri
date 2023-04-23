@@ -12,6 +12,7 @@ import (
 )
 
 const Type = version.Type("snapshot")
+const TimeStampFormat = "20060102.150405"
 
 func Parse(s string) (sv Version, err error) {
 	parts := strings.Split(s, "-")
@@ -24,7 +25,7 @@ func Parse(s string) (sv Version, err error) {
 		err = fmt.Errorf("err: %v, %s", err, "while parsing version")
 		return
 	}
-	t, err := time.Parse("20060102.150405", parts[1])
+	t, err := time.Parse(TimeStampFormat, parts[1])
 	if err != nil {
 		err = fmt.Errorf("err: %v, %s", err, "while parsing timestamp")
 		return
@@ -89,6 +90,10 @@ func (v Version) IsStrictlySemanticNewer(filter filter.Filter, v2 Version) bool 
 	}
 	newer, err := v.IsSemanticNewer(filter, v2)
 	return newer && err == nil
+}
+
+func (v Version) String() string {
+	return fmt.Sprintf("%s-%s-%d", v.Version, v.TimeStamp.Format(TimeStampFormat), v.Iteration)
 }
 
 var ErrNotValidVersion = errors.New("not a valid version")
