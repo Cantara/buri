@@ -1,0 +1,78 @@
+package filter
+
+import (
+	"errors"
+	"github.com/cantara/buri/version"
+	"strconv"
+	"strings"
+)
+
+type Level int
+
+func (fl Level) Locked(l Level) bool {
+	return fl <= l
+}
+
+const (
+	Free  = Level(4)
+	Major = Level(3)
+	Minor = Level(2)
+	Patch = Level(1)
+)
+
+type Version struct {
+	Major int
+	Minor int
+	Patch int
+}
+
+type Filter struct {
+	Level   Level
+	Version Version
+	Type    version.Type
+}
+
+func Parse(pattern string) (filter Filter, err error) {
+	base := strings.Split(pattern, "-")
+	filter.Type = version.Base //This is a bit weird
+	if len(base) == 2 {
+		filter.Type = version.Type(strings.ToLower(base[1]))
+	}
+	parts := strings.Split(base[0], ".")
+	if len(parts) > 3 || len(parts) == 0 {
+		err = ErrNotValidPattern
+		return
+	}
+
+	versionSet := false
+	freeParts := 0
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] == "*" {
+			freeParts++
+			if versionSet {
+				err = ErrNotValidPattern
+				return
+			}
+			continue
+		}
+		versionSet = true
+		var vers int
+		vers, err = strconv.Atoi(parts[i])
+		if err != nil {
+			err = errors.Join(err, ErrNotValidPattern)
+			return
+		}
+		switch i {
+		case 0:
+			filter.Version.Major = vers
+		case 1:
+			filter.Version.Minor = vers
+		case 2:
+			filter.Version.Patch = vers
+		}
+	}
+	filter.Level = Level(freeParts + 1)
+	return
+}
+
+var ErrNotValidPattern = errors.New("not a valid pattern")

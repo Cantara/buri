@@ -4,39 +4,22 @@ import (
 	"errors"
 	"fmt"
 	"github.com/cantara/buri/version"
+	"github.com/cantara/buri/version/filter"
+	"github.com/cantara/buri/version/release"
 	"strconv"
 	"strings"
 	"time"
 )
 
-func IsSemanticNewer(filter version.Filter, v1, v2 Version) (newer bool, err error) {
-	newer, err = version.IsSemanticNewer(filter, v1.Version, v2.Version)
-	if err != nil || newer {
-		return
-	}
-	if v1.TimeStamp.Before(v2.TimeStamp) {
-		newer = true
-		return
-	}
-	if v1.Iteration < v2.Iteration {
-		newer = true
-		return
-	}
-	return
-}
+const Type = version.Type("snapshot")
 
-func IsStrictlySemanticNewer(filter version.Filter, v1, v2 Version) bool {
-	newer, err := IsSemanticNewer(filter, v1, v2)
-	return newer && err == nil
-}
-
-func ParseSnapshotVersion(s string) (sv Version, err error) {
+func Parse(s string) (sv Version, err error) {
 	parts := strings.Split(s, "-")
 	if len(parts) != 3 {
 		err = fmt.Errorf("err: %v, %s", ErrNotValidVersion, "snapshot version string did not have the correct format")
 		return
 	}
-	vers, err := version.ParseVersion(parts[0])
+	vers, err := release.Parse(parts[0])
 	if err != nil {
 		err = fmt.Errorf("err: %v, %s", err, "while parsing version")
 		return
@@ -59,7 +42,7 @@ func ParseSnapshotVersion(s string) (sv Version, err error) {
 	return
 }
 
-func GenerateSnapshotVersion(cur version.Version, itr int) Version {
+func Generate(cur release.Version, itr int) Version {
 	itr++
 	return Version{
 		Version:   cur,
@@ -69,9 +52,43 @@ func GenerateSnapshotVersion(cur version.Version, itr int) Version {
 }
 
 type Version struct {
-	Version   version.Version
+	Version   release.Version
 	TimeStamp time.Time
 	Iteration int
+}
+
+func (v Version) Matches(f filter.Filter) bool {
+	if !v.Version.Matches(f) {
+		return false
+	}
+	return true
+}
+
+func (v Version) IsSemanticNewer(filter filter.Filter, v2 Version) (newer bool, err error) {
+	newer, err = v.Version.IsSemanticNewer(filter, v2.Version)
+	if err != nil || newer {
+		return
+	}
+	if v.TimeStamp.Before(v2.TimeStamp) {
+		newer = true
+		return
+	}
+	if v.Iteration < v2.Iteration {
+		newer = true
+		return
+	}
+	return
+}
+
+func (v Version) IsStrictlySemanticNewer(filter filter.Filter, v2 Version) bool {
+	if !v2.Matches(filter) {
+		return false
+	}
+	if !v.Matches(filter) {
+		return true
+	}
+	newer, err := v.IsSemanticNewer(filter, v2)
+	return newer && err == nil
 }
 
 var ErrNotValidVersion = errors.New("not a valid version")

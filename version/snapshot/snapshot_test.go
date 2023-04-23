@@ -1,13 +1,14 @@
 package snapshot
 
 import (
-	"github.com/cantara/buri/version"
+	"github.com/cantara/buri/version/filter"
+	"github.com/cantara/buri/version/release"
 	"testing"
 )
 
 func TestParseSnapshotVersion(t *testing.T) {
 	vers := "0.16.5-20230418.055134-1"
-	sv, err := ParseSnapshotVersion(vers)
+	sv, err := Parse(vers)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,46 +46,46 @@ func TestParseSnapshotVersion(t *testing.T) {
 
 func TestIsSemanticNewer(t *testing.T) {
 	pattern := "*.*.*"
-	filter, _ := version.ParseFilter(pattern)
-	v1, _ := ParseSnapshotVersion("2.1.9-20230409.123528-1")
-	v2, _ := ParseSnapshotVersion("2.1.9-20230409.141416-2")
-	newer, err := IsSemanticNewer(filter, v1, v1)
+	f, _ := filter.Parse(pattern)
+	v1, _ := Parse("2.1.9-20230409.123528-1")
+	v2, _ := Parse("2.1.9-20230409.141416-2")
+	newer, err := v1.IsSemanticNewer(f, v1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if newer {
-		t.Fatal("version was newer", "filter", filter, "v1", v1)
+		t.Fatal("version was newer", "filter", f, "v1", v1)
 	}
-	newer, err = IsSemanticNewer(filter, v2, v2)
+	newer, err = v2.IsSemanticNewer(f, v2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if newer {
-		t.Fatal("version was newer", "filter", filter, "v2", v2)
+		t.Fatal("version was newer", "filter", f, "v2", v2)
 	}
-	newer, err = IsSemanticNewer(filter, v2, v1)
+	newer, err = v2.IsSemanticNewer(f, v1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if newer {
-		t.Fatal("version was newer", "filter", filter, "v1", v1, "v2", v2)
+		t.Fatal("version was newer", "filter", f, "v1", v1, "v2", v2)
 	}
-	newer, err = IsSemanticNewer(filter, v1, v2)
+	newer, err = v1.IsSemanticNewer(f, v2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !newer {
-		t.Fatal("version was not newer", "filter", filter, "v1", v1, "v2", v2)
+		t.Fatal("version was not newer", "filter", f, "v1", v1, "v2", v2)
 	}
 }
 
 func TestGenerateSnapshotVersion(t *testing.T) {
-	vers := version.Version{
+	vers := release.Version{
 		Major: 1,
 		Minor: 5,
 		Patch: 2,
 	}
-	sv := GenerateSnapshotVersion(vers, 2)
+	sv := Generate(vers, 2)
 	if sv.Version.Major != 1 {
 		t.Fatal("wrong major version", "major", sv.Version.Major)
 	}

@@ -3,34 +3,26 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/cantara/buri/maven"
 	"github.com/cantara/buri/pack"
-	"github.com/cantara/buri/version"
-	"io/fs"
+	"github.com/cantara/buri/readers"
+	"github.com/cantara/buri/readers/maven"
+	versionFilter "github.com/cantara/buri/version/filter"
+	"github.com/cantara/buri/version/release"
+	"github.com/joho/godotenv"
 	"os"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
-	"time"
-
-	"github.com/joho/godotenv"
 
 	log "github.com/cantara/bragi"
 	"github.com/cantara/buri/exec"
 )
 
-type program struct {
-	path        string
-	version     version.Version
-	updatedTime time.Time
-}
-
 var displayHelpText bool
 var repoUrl string
 var groupId string
 var artifactId string
-var versionFilter string
+var filterString string
 var shouldRun bool
 var numVersionsToKeep int
 var kill bool
@@ -56,7 +48,7 @@ func init() {
 	flag.StringVar(&repoUrl, "u", "https://mvnrepo.cantara.no/content/repositories/releases", repoUrlHelpText)
 	flag.StringVar(&groupId, "g", "", groupIdHelpText)
 	flag.StringVar(&artifactId, "a", "", artifactIdHelpText)
-	flag.StringVar(&versionFilter, "f", "*.*.*", versionFilterHelpText)
+	flag.StringVar(&filterString, "f", "*.*.*", versionFilterHelpText)
 	flag.BoolVar(&shouldRun, "r", false, shouldRunHelpText)
 	flag.IntVar(&numVersionsToKeep, "k", 4, versionsToKeepHelpText)
 	flag.BoolVar(&kill, "kill", false, killHelpText)
@@ -70,7 +62,7 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
-	if !onlyKeepAlive && (repoUrl == "" || groupId == "" || artifactId == "" || versionFilter == "") {
+	if !onlyKeepAlive && (repoUrl == "" || groupId == "" || artifactId == "" || filterString == "") {
 		fmt.Print("All the following values is required:\n url to repo, groupId, artifactId, semantic version filter\n\n")
 		flag.PrintDefaults()
 		return
@@ -79,7 +71,7 @@ func main() {
 		flag.PrintDefaults()
 		return
 	}
-	filter, err := version.ParseFilter(versionFilter)
+	filter, err := versionFilter.Parse(filterString)
 	hd, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
@@ -94,7 +86,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fileSystem := os.DirFS(wd)
 
 	linkName := artifactId
 	if len(subArtifact) > 1 {
@@ -154,81 +145,36 @@ sleep 5
 	}
 	url := fmt.Sprintf("%s/%s/%s", repoUrl, groupId, artifactId)
 
-	var runningVersion version.Version
 	/*
-		if packageType == "go" {
-			runningVersion = "v" + runningVersion
-		}
-	*/
-	removeLink := false
-	var versionsOnSystem []program
-	fs.WalkDir(fileSystem, ".", func(path string, d fs.DirEntry, err error) error {
-		if path == "." {
-			return nil
-		}
-		log.Debug("path: ", path)
-		if path == linkName {
-			linkPath, err := os.Readlink(path)
-			if err != nil {
-				log.AddError(err).Info("While trying to real symlink to get current verson")
-				return nil
-			}
-			fileName := strings.ReplaceAll(strings.ReplaceAll(filepath.Base(linkPath), "-"+runtime.GOOS, ""), "-"+runtime.GOARCH, "")
-			fileNameEls := strings.Split(fileName, "-")
-			runningVersionString := fileNameEls[len(fileNameEls)-1]
-			if strings.HasSuffix(packageType, "jar") { //should probably just do this always
-				runningVersionString = strings.TrimSuffix(runningVersionString, ".jar")
-			}
-			runningVersion, err = version.ParseVersion(runningVersionString)
-			removeLink = true
-			return nil
-		}
-		if strings.HasPrefix(path, linkName+"-") {
-			log.Debug(path)
-			log.Debug(linkName)
-			name := filepath.Base(path)
-			name = strings.TrimSuffix(name, ".jar")
-			name = strings.ReplaceAll(name, "-"+runtime.GOOS, "")
-			name = strings.ReplaceAll(name, "-"+runtime.GOARCH, "")
-			name = strings.ReplaceAll(name, "-SNAPSHOT", "")
-			versionString := strings.ReplaceAll(name, linkName+"-", "")
-			if len(strings.Split(versionString, "-")) > 1 {
-				log.Debug("skipping since it is probably a sub artifact: ", versionString)
-				return nil
-			}
-			vers, err := version.ParseVersion(versionString)
-			if err != nil {
-				return err
-			}
-			versionsOnSystem = append(versionsOnSystem, program{
-				path:    path,
-				version: vers,
-			})
-		}
-		if d.IsDir() {
-			return fs.SkipDir
-		}
-		return nil
-	})
-	log.Debug(versionsOnSystem)
+		var versionType Version[version.Base]
+		versionType = reflect.TypeOf(version.Base)
 
-	sort.Slice(versionsOnSystem, func(i, j int) bool {
-		if filter.Snapshot {
-			return false //snapshot.IsStrictlySemanticNewer(filter, versionsOnSystem[i].version, versionsOnSystem[j].version)
-		}
-		return version.IsStrictlySemanticNewer(filter, versionsOnSystem[i].version, versionsOnSystem[j].version)
+		var runningVersion reflect.TypeOf("test")
+			if packageType == "go" {
+				runningVersion = "v" + runningVersion
+			}
+	*/
+
+	disk := os.DirFS(wd)
+	versionsOnDisk, runningVersion, removeLink, err := readers.VersionOnDisk[release.Version](disk, filter, linkName, packageType)
+	//var runningVersion readers.Version[release.Version]
+	//removeLink := false
+	log.Debug(versionsOnDisk)
+
+	sort.Slice(versionsOnDisk, func(i, j int) bool {
+		return versionsOnDisk[i].Version.IsStrictlySemanticNewer(filter, versionsOnDisk[j].Version)
 	})
 	defer func() {
-		for i := 0; i < len(versionsOnSystem)-numVersionsToKeep; i++ {
-			err = os.RemoveAll(versionsOnSystem[i].path)
-			log.AddError(err).Info("while removing ", versionsOnSystem[i].path)
+		for i := 0; i < len(versionsOnDisk)-numVersionsToKeep; i++ {
+			err = os.RemoveAll(versionsOnDisk[i].Path)
+			log.AddError(err).Info("while removing ", versionsOnDisk[i].Path)
 		}
 	}()
 
 	//log.Debug(url)
 	params := maven.GetParamsURL("<td>(.+)</td>", url)
 	//log.Debug(params)
-	var programs []program
+	var programs []readers.Program[release.Version]
 	for i := 1; i+1 < len(params); i++ {
 		urlPars := maven.GetParams("<a href=\"(.+)\">(.+)</a>", params[i])
 		if len(urlPars) != 2 {
@@ -256,30 +202,30 @@ sleep 5
 				"/"), strings.TrimPrefix(urlPars[0], "/"))
 		}
 		versionString := strings.TrimSuffix(urlPars[1], "/")
-		vers, err := version.ParseVersion(versionString)
+		vers, err := release.Parse(versionString)
 		if err != nil {
 			log.AddError(err).Error("while parsing version")
 			continue
 		}
-		if !filter.Matches(vers) {
+		if !vers.Matches(filter) {
 			continue
 		}
 
 		log.Println(vers)
-		programs = append(programs, program{
-			path:    path,
-			version: vers,
+		programs = append(programs, readers.Program[release.Version]{
+			Path:    path,
+			Version: vers,
 			//updatedTime: t,
 		})
 	}
-	var newestP *program
+	var newestP *readers.Program[release.Version]
 	for i, p := range programs {
 		if newestP == nil {
 			newestP = &programs[i]
 			continue
 		}
-		log.Debug("testing", "filter", filter, "v1", newestP.version, "v2", p.version)
-		if version.IsStrictlySemanticNewer(filter, newestP.version, p.version) {
+		log.Debug("testing", "filter", filter, "v1", newestP.Version, "v2", p.Version)
+		if newestP.Version.IsStrictlySemanticNewer(filter, p.Version) {
 			log.Debug("Was newer")
 			newestP = &programs[i]
 		}
@@ -288,7 +234,7 @@ sleep 5
 		log.Fatal("No version found")
 	}
 
-	foundNewerVersion = runningVersion == version.Version{} || version.IsStrictlySemanticNewer(filter, runningVersion, newestP.version)
+	foundNewerVersion = runningVersion.IsStrictlySemanticNewer(filter, newestP.Version)
 
 	if !foundNewerVersion {
 		return
@@ -297,12 +243,12 @@ sleep 5
 
 	var path string
 	if len(subArtifact) == 1 {
-		path = newestP.path
+		path = newestP.Path
 	} else {
-		path = fmt.Sprintf("%s/%s/", strings.TrimSuffix(newestP.path, "/"), strings.Join(subArtifact[1:], "/"))
+		path = fmt.Sprintf("%s/%s/", strings.TrimSuffix(newestP.Path, "/"), strings.Join(subArtifact[1:], "/"))
 	}
-	path = fmt.Sprintf("%s%s-%s", path, artifactId, newestP.version)
-	fileName := fmt.Sprintf("%s-%s", strings.TrimSuffix(linkName, ".jar"), newestP.version)
+	path = fmt.Sprintf("%s%s-%s", path, artifactId, newestP.Version)
+	fileName := fmt.Sprintf("%s-%s", strings.TrimSuffix(linkName, ".jar"), newestP.Version)
 	switch strings.ToLower(packageType) {
 	case "go":
 		fileName = fmt.Sprintf("%s-%s-%s", fileName, runtime.GOOS, runtime.GOARCH)
