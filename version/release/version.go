@@ -3,6 +3,7 @@ package release
 import (
 	"errors"
 	"fmt"
+	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/version"
 	"github.com/cantara/buri/version/filter"
 	"strconv"
@@ -54,8 +55,8 @@ func (v Version) String() string {
 	}
 }
 
-func (v1 Version) IsSemanticNewer(filter filter.Filter, v2 Version) (newer bool, err error) {
-	if !v1.Matches(filter) {
+func (v Version) IsSemanticNewer(filter filter.Filter, v2 Version) (newer bool, err error) {
+	if !v.Matches(filter) {
 		err = ErrVersionDoesNotMatchFilter
 		return
 	}
@@ -63,29 +64,39 @@ func (v1 Version) IsSemanticNewer(filter filter.Filter, v2 Version) (newer bool,
 		err = ErrVersionDoesNotMatchFilter
 		return
 	}
-	if v1.Major < v2.Major {
+	log.Trace("release is semantic newer", "filter", filter, "v1", v, "v2", v2)
+	if v.Major < v2.Major {
 		newer = true
 		return
 	}
-	if v1.Minor < v2.Minor {
+	if v.Major > v2.Major {
+		newer = false
+		return
+	}
+	if v.Minor < v2.Minor {
 		newer = true
 		return
 	}
-	if v1.Patch < v2.Patch {
+	if v.Minor > v2.Minor {
+		newer = false
+		return
+	}
+	if v.Patch < v2.Patch {
 		newer = true
 		return
 	}
 	return
 }
 
-func (v1 Version) IsStrictlySemanticNewer(filter filter.Filter, v2 Version) bool {
+func (v Version) IsStrictlySemanticNewer(filter filter.Filter, v2 Version) bool {
+	log.Trace("release testing strictly semantic newer", "filter", filter, "v1", v, "v2", v2)
 	if !v2.Matches(filter) {
 		return false
 	}
-	if !v1.Matches(filter) {
+	if !v.Matches(filter) {
 		return true
 	}
-	newer, err := v1.IsSemanticNewer(filter, v2)
+	newer, err := v.IsSemanticNewer(filter, v2)
 	return newer && err == nil
 }
 

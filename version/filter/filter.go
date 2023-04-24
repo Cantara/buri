@@ -2,6 +2,7 @@ package filter
 
 import (
 	"errors"
+	"fmt"
 	"github.com/cantara/buri/version"
 	"strconv"
 	"strings"
@@ -30,6 +31,24 @@ type Filter struct {
 	Level   Level
 	Version Version
 	Type    version.Type
+}
+
+func (f Filter) String() string {
+	base := ""
+	switch f.Level {
+	case Free:
+		base = "*.*.*"
+	case Major:
+		base = fmt.Sprintf("%d.*.*", f.Version.Major)
+	case Minor:
+		base = fmt.Sprintf("%d.%d.*", f.Version.Major, f.Version.Minor)
+	case Patch:
+		base = fmt.Sprintf("%d.%d.%d", f.Version.Major, f.Version.Minor, f.Version.Patch)
+	}
+	if f.Type == version.Base {
+		return base
+	}
+	return fmt.Sprintf("%s-%s", base, strings.ToUpper(string(f.Type)))
 }
 
 func Parse(pattern string) (filter Filter, err error) {

@@ -3,6 +3,7 @@ package snapshot
 import (
 	"errors"
 	"fmt"
+	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/version"
 	"github.com/cantara/buri/version/filter"
 	"github.com/cantara/buri/version/release"
@@ -82,6 +83,7 @@ func (v Version) IsSemanticNewer(filter filter.Filter, v2 Version) (newer bool, 
 }
 
 func (v Version) IsStrictlySemanticNewer(filter filter.Filter, v2 Version) bool {
+	log.Trace("release testing strictly semantic newer", "filter", filter, "v1", v, "v2", v2)
 	if !v2.Matches(filter) {
 		return false
 	}

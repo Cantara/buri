@@ -122,4 +122,18 @@ func TestIsStrictlySemanticNewer(t *testing.T) {
 		t.Fatal("version was not newer", "filter", f, "v1", v1, "v2", v2)
 	}
 
+	pattern = "*.*.*"
+	f, _ = filter.Parse(pattern)
+	v1, _ = Parse("v0.9.8")
+	v2, _ = Parse("v0.10.1")
+	newer = v1.IsStrictlySemanticNewer(f, v2)
+	if !newer {
+		t.Fatal("version was not newer", "filter", f, "v1", v1, "v2", v2)
+	}
+	v1, _ = Parse("v0.10.1")
+	v2, _ = Parse("v0.9.8")
+	newer = v1.IsStrictlySemanticNewer(f, v2)
+	if newer {
+		t.Fatal("version was newer", "filter", f, "v1", v1, "v2", v2)
+	}
 }
