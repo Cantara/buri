@@ -12,49 +12,33 @@ import (
 
 func Version[T readers.Version[T]](f filter.Filter, url, packageType string) (newestMaven readers.Program[T]) {
 	log.Info("maven version", "url", url)
-	params := GetParamsURL("<td>(.+)</td>", url)
-	//log.Debug(params)
-	//var programs []readers.Program[release.Version]
+	filenames := GetFileNames(url)
+	log.Trace("finding maven base versions", "filenames", filenames)
 	var newestMavenDir readers.Program[release.Version]
-	for i := 1; i+1 < len(params); i++ {
-		urlPars := GetParams("<a href=\"(.+)\">(.+)</a>", params[i])
-		if len(urlPars) != 2 {
-			//log.Fatal("Wrong number of urls in path to version")
+	for _, filename := range filenames {
+		/* Nexus 2 has Nexus 3 does not
+		if !strings.HasSuffix(filename, "/") {
 			continue
 		}
-		if !strings.HasSuffix(urlPars[0], "/") {
-			continue
-		}
-		if packageType == "go" && !strings.HasPrefix(urlPars[1], "v") { //Could be removed if you don't want go specific selection
-			continue
-		}
-		//log.Println(urlPars)
-		/*
-			t, err := time.Parse("Mon Jan 02 15:04:05 MST 2006", params[i+1])
-			if err != nil {
-				log.Fatal(err)
-			}
 		*/
+		filename = strings.TrimSuffix(filename, "/")
+		filterMatch := filename
+		if packageType == "go" {
+			if !strings.HasPrefix(filename, "v") {
+				continue
+			}
+			filterMatch = strings.TrimPrefix(filterMatch, "v")
+		}
+		if !f.Matches(filterMatch) {
+			continue
+		}
 
-		var path string
-		if strings.HasPrefix(urlPars[0], "http") {
-			path = urlPars[0]
-		} else {
-			path = fmt.Sprintf("%s/%s", strings.TrimSuffix(url, "/"), strings.TrimPrefix(urlPars[0], "/"))
+		path := fmt.Sprintf("%s/%s", strings.TrimSuffix(url, "/"), filename)
+
+		if f.Type != release.Type {
+			filename = strings.TrimSuffix(filename, "-"+strings.ToUpper(string(f.Type)))
 		}
-		versionString := strings.Split(strings.TrimSuffix(urlPars[1], "/"), "-")[0]
-		/*
-			versAny, err := parser.Parse(f, versionString)
-			if err != nil {
-				log.WithError(err).Debug("while parsing version")
-				continue
-			}
-			vers := versAny.(T)
-			if !vers.Matches(f) {
-				continue
-			}
-		*/
-		vers, err := release.Parse(versionString)
+		vers, err := release.Parse(filename)
 		if err != nil {
 			log.WithError(err).Debug("while parsing version")
 			continue
@@ -65,57 +49,37 @@ func Version[T readers.Version[T]](f filter.Filter, url, packageType string) (ne
 			newestMavenDir = readers.Program[release.Version]{
 				Path:    path,
 				Version: vers,
-				//updatedTime: t,
 			}
 			continue
 		}
-
-		/*
-			programs = append(programs, readers.Program[release.Version]{
-				Path:    path,
-				Version: vers,
-				//updatedTime: t,
-			})
-		*/
 	}
 	if newestMavenDir.Path == "" {
 		log.Fatal("no version found in maven")
 	}
 	if f.Type == release.Type {
-		newestMavenDir.Path = strings.ReplaceAll(newestMavenDir.Path, "service/rest/repository/browse/", "repository/")
+		newestMavenDir.Path = strings.ReplaceAll(newestMavenDir.Path, "service/rest/repository/browse/", "repository/") + "/"
 		newestMaven = any(newestMavenDir).(readers.Program[T])
 		return
 	}
-	params = GetParamsURL("<td>(.+)</td>", strings.TrimSuffix(newestMavenDir.Path, "/"))
-	for i := 1; i+1 < len(params); i++ {
-		urlPars := GetParams("<a href=\"(.+)\">(.+)</a>", params[i])
-		if len(urlPars) != 2 {
-			//log.Fatal("Wrong number of urls in path to version")
+
+	urlParts := strings.Split(url, "/")
+	artifactId := urlParts[len(urlParts)-1]
+	filenames = GetFileNames(newestMavenDir.Path)
+	log.Trace("finding maven full versions", "filenames", filenames)
+	for _, filename := range filenames {
+		log.Trace("non release", "filename", filename)
+		version := strings.TrimPrefix(filename, artifactId+"-")
+		if packageType == "go" && !strings.HasPrefix(version, "v") {
 			continue
 		}
-		if !strings.HasSuffix(urlPars[0], "/") {
-			continue
+		if strings.HasSuffix(packageType, "jar") {
+			version = strings.TrimSuffix(version, ".jar")
 		}
-		if packageType == "go" && !strings.HasPrefix(urlPars[1], "v") { //Could be removed if you don't want go specific selection
-			continue
+		if strings.HasPrefix(packageType, "zip") {
+			version = strings.TrimSuffix(version, ".zip")
 		}
-		//log.Println(urlPars)
-		/*
-			t, err := time.Parse("Mon Jan 02 15:04:05 MST 2006", params[i+1])
-			if err != nil {
-				log.Fatal(err)
-			}
-		*/
-		/*
-			var path string
-			if strings.HasPrefix(urlPars[0], "http") {
-				path = urlPars[0]
-			} else {
-				path = fmt.Sprintf("%s/%s", strings.TrimSuffix(strings.ReplaceAll(newestMavenDir.Path, "service/rest/repository/browse/", "repository/"),
-					"/"), strings.TrimPrefix(urlPars[0], "/"))
-			}
-		*/
-		versionString := strings.TrimSuffix(urlPars[1], "/")
+		versionString := strings.TrimSuffix(version, "/")
+		log.Trace("testing non release version", "maven", versionString)
 		versAny, err := parser.Parse(f, versionString)
 		if err != nil {
 			log.WithError(err).Debug("while parsing version")
@@ -132,7 +96,7 @@ func Version[T readers.Version[T]](f filter.Filter, url, packageType string) (ne
 		log.Trace("read", "version", vers)
 		if newestMaven.Version.IsStrictlySemanticNewer(f, vers) {
 			newestMaven = readers.Program[T]{
-				Path:    strings.ReplaceAll(newestMavenDir.Path, "service/rest/repository/browse/", "repository/"),
+				Path:    strings.ReplaceAll(newestMavenDir.Path, "service/rest/repository/browse/", "repository/") + "/",
 				Version: vers,
 				//updatedTime: t,
 			}

@@ -2,13 +2,14 @@ package maven
 
 import (
 	log "github.com/cantara/bragi/sbragi"
+	"golang.org/x/net/html"
 	"io"
 	"net/http"
 	"os"
-	"regexp"
+	"strings"
 )
 
-func GetParamsURL(regEx, url string) (params []string) {
+func GetFileNames(url string) (filenames []string) {
 	c := http.Client{}
 	r, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -26,23 +27,53 @@ func GetParamsURL(regEx, url string) (params []string) {
 	if err != nil {
 		log.WithError(err).Fatal("while reading body from request getting param urls")
 	}
-	params = GetParams(regEx, string(body))
-	log.Debug("maven", "params", params)
+	filenames = parse(string(body))
 	return
 }
 
-func GetParams(regEx, data string) (params []string) {
-	var compRegEx = regexp.MustCompile(regEx)
-	matches := compRegEx.FindAllStringSubmatch(data, -1)
+func parse(text string) (data []string) {
+	tkn := html.NewTokenizer(strings.NewReader(text))
+	var vals []string
 
-	for _, line := range matches {
-		for i, match := range line {
-			//log.Debug(match)
-			if i == 0 {
+	for {
+		tt := tkn.Next()
+		switch {
+		case tt == html.ErrorToken:
+			return vals
+		case tt == html.StartTagToken:
+			t := tkn.Token()
+			if t.Data != "tr" {
 				continue
 			}
-			params = append(params, match)
+			for {
+				tt = tkn.Next()
+				if tt == html.ErrorToken {
+					return vals
+				}
+				if tt == html.StartTagToken {
+					t = tkn.Token()
+					if t.Data != "th" {
+						continue
+					}
+					break
+				}
+				if tt == html.EndTagToken {
+					t = tkn.Token()
+					if t.Data != "tr" {
+						continue
+					}
+					break
+				}
+				if tt == html.TextToken {
+					t := tkn.Token()
+					d := strings.TrimSpace(t.Data)
+					if d == "" {
+						continue
+					}
+					vals = append(vals, d)
+					break
+				}
+			}
 		}
 	}
-	return
 }

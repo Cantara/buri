@@ -6,6 +6,7 @@ require (
 	github.com/cantara/bragi v0.6.9
 	github.com/joho/godotenv v1.5.1
 	github.com/shirou/gopsutil/v3 v3.23.3
+	golang.org/x/net v0.9.0
 )
 
 require (
@@ -17,5 +18,5 @@ require (
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/exp v0.0.0-20230213192124-5e25df0256eb // indirect
-	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/sys v0.7.0 // indirect
 )

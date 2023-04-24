@@ -27,12 +27,18 @@ func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName, packag
 				log.WithError(err).Error("while trying to read symlink to get current version")
 				return nil
 			}
+			linkPathParts := strings.Split(linkPath, "/")
+			linkPath = linkPathParts[len(linkPathParts)-1]
+			artifactId := linkName
 			fileName := strings.ReplaceAll(strings.ReplaceAll(filepath.Base(linkPath), "-"+runtime.GOOS, ""), "-"+runtime.GOARCH, "")
-			fileNameEls := strings.Split(fileName, "-")
-			runningVersionString := fileNameEls[len(fileNameEls)-1]
+			//fileNameEls := strings.Split(fileName, "-")
+			runningVersionString := fileName
 			if strings.HasSuffix(packageType, "jar") { //should probably just do this always
 				runningVersionString = strings.TrimSuffix(runningVersionString, ".jar")
+				artifactId = strings.TrimSuffix(artifactId, ".jar")
 			}
+			runningVersionString = strings.TrimPrefix(runningVersionString, artifactId+"-")
+			log.Trace("modified link", "path", path, "link", linkPath, "artifactId", artifactId, "filename", fileName, "version", runningVersionString)
 			runningVersionAny, err := parser.Parse(f, runningVersionString)
 			if err != nil {
 				log.WithError(err).Debug("while trying to parse version")

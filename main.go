@@ -216,6 +216,7 @@ sleep 5
 		fileName = strings.TrimSuffix(fileName, ".zip")
 		linkName = strings.TrimSuffix(linkName, ".jar")
 	}
+	os.Remove(linkName)
 	err = os.Symlink(fileName, linkName)
 	if err != nil {
 		log.WithError(err).Fatal("while sym linking")

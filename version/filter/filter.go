@@ -3,6 +3,7 @@ package filter
 import (
 	"errors"
 	"fmt"
+	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/version"
 	"strconv"
 	"strings"
@@ -31,6 +32,19 @@ type Filter struct {
 	Level   Level
 	Version Version
 	Type    version.Type
+}
+
+func (f Filter) Matches(s string) bool {
+	f2, err := Parse(s)
+	if err != nil {
+		log.WithError(err).Trace("string matches filter", "string", s)
+		return false
+	}
+	if f.Type != f2.Type {
+		return false
+	}
+
+	return true
 }
 
 func (f Filter) String() string {

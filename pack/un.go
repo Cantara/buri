@@ -98,6 +98,7 @@ func UnZip(srcFile, linkName string) (err error) {
 			}
 		}()
 	}
+	os.Remove(linkName)
 	err = os.Symlink(fmt.Sprintf("%[1]s/%[1]s.jar", fn), linkName)
 	if err != nil {
 		log.Fatal(err)
