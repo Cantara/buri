@@ -62,7 +62,7 @@ func UnTGZ(srcFile string) (err error) {
 	}
 }
 
-func UnZip(srcFile, linkName string) (err error) {
+func UnZip(srcFile string) (fn string, err error) {
 	base := strings.TrimSuffix(srcFile, ".tgz")
 	os.Mkdir(base, 0750)
 	r, err := zip.OpenReader(srcFile)
@@ -70,7 +70,7 @@ func UnZip(srcFile, linkName string) (err error) {
 		return
 	}
 	defer r.Close()
-	fn := filepath.Base(srcFile)
+	fn = filepath.Base(srcFile)
 	fn = strings.TrimSuffix(fn, filepath.Ext(fn))
 	for _, f := range r.File {
 		fmt.Printf("Contents of %s:\n", f.Name)
@@ -97,11 +97,6 @@ func UnZip(srcFile, linkName string) (err error) {
 				log.Fatal("wrote less than file size")
 			}
 		}()
-	}
-	os.Remove(linkName)
-	err = os.Symlink(fmt.Sprintf("%[1]s/%[1]s.jar", fn), linkName)
-	if err != nil {
-		log.Fatal(err)
 	}
 	return
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/cantara/buri/readers/maven"
 	versionFilter "github.com/cantara/buri/version/filter"
 	"github.com/cantara/buri/version/generic"
+	"github.com/cantara/buri/version/release"
 	"github.com/joho/godotenv"
 	"os"
 	"runtime"
@@ -211,8 +212,21 @@ sleep 5
 		linkName = strings.TrimSuffix(linkName, ".tgz")
 	} else if strings.HasPrefix(packageType, "zip") {
 		linkName = strings.TrimSuffix(linkName, ".zip")
-		pack.UnZip(fileName, linkName)
+		fn, err := pack.UnZip(fileName)
+		if err != nil {
+			log.WithError(err).Fatal("while unpacking zip")
+		}
 		os.Remove(fileName)
+		os.Remove(linkName)
+		versionParts := strings.Split(mavenVersion, "-")
+		innerVersion := versionParts[0]
+		if filter.Type != release.Type {
+			innerVersion = fmt.Sprintf("%s-%s", innerVersion, strings.ToUpper(string(filter.Type)))
+		}
+		err = os.Symlink(fmt.Sprintf("%s/%s-%s.jar", fn, artifactId, innerVersion), linkName)
+		if err != nil {
+			log.WithError(err).Fatal("while symlinking inner jar")
+		}
 		fileName = strings.TrimSuffix(fileName, ".zip")
 		linkName = strings.TrimSuffix(linkName, ".jar")
 	}
