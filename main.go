@@ -101,16 +101,6 @@ func main() {
 		linkName = fmt.Sprintf("%s-%s", linkName, strings.Join(subArtifact[1:], "-"))
 	}
 
-	if shouldRun {
-		os.Mkdir(hd+"/scripts", 0750)
-		os.WriteFile(fmt.Sprintf("%s/scripts/restart_%s.sh", hd, linkName), []byte(fmt.Sprintf(`#!/bin/sh
-#This script is managed by BURI https://github.com/cantara/buri
-~/scripts/kill_%[1]s.sh
-sleep 5
-~/scripts/start_%[1]s.sh
-`, linkName)), 0750)
-	}
-
 	if strings.HasSuffix(packageType, "jar") {
 		linkName = fmt.Sprintf("%s.jar", linkName)
 	}
@@ -126,21 +116,33 @@ sleep 5
 
 	err = godotenv.Load(fmt.Sprintf(".env.buri.%s", strings.TrimSuffix(linkName, ".jar")))
 	if err != nil {
-		log.WithError(err).Info("while reading env", "name", linkName)
+		log.WithError(err).Trace("while reading env", "name", linkName)
 	}
 	foundNewerVersion := false
 	defer func() {
+		log.Info("exiting", "should_run", shouldRun, "only keep alive", onlyKeepAlive)
 		if !shouldRun && !onlyKeepAlive {
 			return
 		}
+		os.Mkdir(hd+"/scripts", 0750)
+		os.WriteFile(fmt.Sprintf("%s/scripts/restart_%s.sh", hd, linkName), []byte(fmt.Sprintf(`#!/bin/sh
+#This script is managed by BURI https://github.com/cantara/buri
+~/scripts/kill_%[1]s.sh
+sleep 5
+~/scripts/start_%[1]s.sh
+`, linkName)), 0750)
 		os.WriteFile(fmt.Sprintf("%s/scripts/start_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
 %s > /dev/null
-`, strings.Join(os.Args, " "))), 0750)
+`, ToBashCommandString(command))), 0750)
 		os.WriteFile(fmt.Sprintf("%s/scripts/kill_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
 %s -kill > /dev/null
 `, strings.Join(os.Args, " "))), 0750)
+		os.WriteFile(fmt.Sprintf("%s/scripts/update_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
+#This script is managed by BURI https://github.com/cantara/buri
+%s > /dev/null
+`, ToBashCommandString(os.Args))), 0750)
 		if foundNewerVersion {
 			exec.KillService(command)
 		} else if exec.IsRunning(command) {
@@ -235,4 +237,19 @@ sleep 5
 	if err != nil {
 		log.WithError(err).Fatal("while sym linking")
 	}
+}
+
+func ToBashCommandString(cmd []string) string {
+	var buf strings.Builder
+	for i := range cmd {
+		if i == 0 {
+			buf.WriteString(cmd[0])
+			continue
+		}
+		buf.WriteString(" \"")
+		buf.WriteString(cmd[i])
+		buf.WriteRune('"')
+	}
+
+	return buf.String()
 }
