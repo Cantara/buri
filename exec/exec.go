@@ -2,13 +2,13 @@ package exec
 
 import (
 	"context"
-	"fmt"
-	log "github.com/cantara/bragi"
-	"github.com/joho/godotenv"
+	"errors"
+	log "github.com/cantara/bragi/sbragi"
 	"github.com/shirou/gopsutil/v3/process"
+	"io"
 	"os"
-	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -17,7 +17,7 @@ func KillService(command []string) (killed bool) {
 
 	procs, err := process.Processes()
 	if err != nil {
-		log.AddError(err).Fatal("while getting processes")
+		log.WithError(err).Fatal("while getting processes")
 	}
 	for _, proc := range procs {
 		if uids, err := proc.Uids(); err != nil || int(uids[0]) != os.Getuid() {
@@ -25,7 +25,7 @@ func KillService(command []string) (killed bool) {
 		}
 		cmd, err := proc.Cmdline()
 		if err != nil {
-			log.AddError(err).Warning("while getting cmd")
+			log.WithError(err).Warning("while getting cmd")
 			continue
 		}
 		if cmd != commandString {
@@ -39,7 +39,7 @@ func KillService(command []string) (killed bool) {
 		if err != nil {
 			err = proc.Kill()
 			if err != nil {
-				log.AddError(err).Error("while terminating service", "cmd", cmd)
+				log.WithError(err).Error("while terminating service", "cmd", cmd)
 			}
 			//TODO: Wait for killed
 		}
@@ -53,7 +53,7 @@ func IsRunning(command []string) (running bool) {
 
 	procs, err := process.Processes()
 	if err != nil {
-		log.AddError(err).Fatal("while getting processes")
+		log.WithError(err).Fatal("while getting processes")
 	}
 	for _, proc := range procs {
 		if uids, err := proc.Uids(); err != nil || int(uids[0]) != os.Getuid() {
@@ -61,7 +61,7 @@ func IsRunning(command []string) (running bool) {
 		}
 		cmd, err := proc.Cmdline()
 		if err != nil {
-			log.AddError(err).Warning("while getting cmd")
+			log.WithError(err).Warning("while getting cmd")
 			continue
 		}
 		if cmd != commandString {
@@ -73,38 +73,37 @@ func IsRunning(command []string) (running bool) {
 	return
 }
 
-func StartService(command []string, artifactId, linkName, wd string) {
-	stdOut, err := os.OpenFile(fmt.Sprintf("%s/%sOut", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+func StartService(startScript, outFile string) {
+	MakeFile(outFile, "")
+	err := syscall.Exec(startScript, nil, os.Environ())
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).Error("while executing start script")
 	}
-	stdErr, err := os.OpenFile(fmt.Sprintf("%s/%sErr", wd, artifactId), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+}
+
+func MakeFile(path, content string) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		log.WithError(err).Error("while checking if tile exists", "path", path)
+		return
+	}
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).Error("while creating file")
+		return
 	}
-	var cmd *exec.Cmd
-	if len(command) == 1 {
-		cmd = exec.Command(command[0])
-	} else {
-		cmd = exec.Command(command[0], command[1:]...)
-	}
-	var envMap map[string]string
-	envMap, err = godotenv.Read(".env." + strings.TrimSuffix(linkName, ".jar")) //, strings.TrimSuffix(linkName, ".jar")+".env")
+	_, err = io.WriteString(f, content)
 	if err != nil {
-		log.AddError(err).Info("while reading env files")
+		log.WithError(err).Error("while writing initial content to file")
+		return
 	}
-	env := make([]string, len(envMap))
-	i := 0
-	for k, v := range envMap {
-		env[i] = fmt.Sprintf("%s=%s", k, v)
-		i++
-	}
-	cmd.Env = append(cmd.Environ(), env...)
-	cmd.Stdout = stdOut
-	cmd.Stderr = stdErr
-	log.Debug(cmd)
-	err = cmd.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
+	defer func() {
+		err = f.Close()
+		if err != nil {
+			log.WithError(err).Warning("while closing the newly created file")
+		}
+	}()
 }

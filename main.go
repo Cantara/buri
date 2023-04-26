@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"github.com/cantara/buri/pack"
@@ -124,31 +125,57 @@ func main() {
 		if !shouldRun && !onlyKeepAlive {
 			return
 		}
+		name := strings.TrimSuffix(linkName, ".jar")
+		startScript := fmt.Sprintf("%s/scripts/start_%s.sh", hd, name)
+		outFile := fmt.Sprintf("%s/%s.out", wd, name)
+		argsFile := fmt.Sprintf("%s/%s.args", wd, name)
+		argsFileContent := fmt.Sprintf(`#ARG's file for %s 
+APP_ARGS=""`, name)
+		if strings.Contains(packageType, "jar") {
+			argsFileContent = argsFileContent + "\nJVM_ARGS=\"\""
+		}
+		exec.MakeFile(argsFile, argsFileContent)
 		os.Mkdir(hd+"/scripts", 0750)
-		os.WriteFile(fmt.Sprintf("%s/scripts/restart_%s.sh", hd, linkName), []byte(fmt.Sprintf(`#!/bin/sh
+		os.WriteFile(fmt.Sprintf("%s/scripts/restart_%s.sh", hd, name), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
 ~/scripts/kill_%[1]s.sh
 sleep 5
 ~/scripts/start_%[1]s.sh
-`, linkName)), 0750)
-		os.WriteFile(fmt.Sprintf("%s/scripts/start_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
-#This script is managed by BURI https://github.com/cantara/buri
-%s > /dev/null
-`, ToBashCommandString(command))), 0750)
-		os.WriteFile(fmt.Sprintf("%s/scripts/kill_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
+`, name)), 0750)
+		var startScriptContent bytes.Buffer
+		startScriptContent.WriteString("#!/bin/sh\n#This script is managed by BURI https://github.com/cantara/buri")
+		startScriptContent.WriteString("\nsource ")
+		startScriptContent.WriteString(argsFile)
+		startScriptContent.WriteRune('\n')
+		startScriptContent.WriteString(`echo "Extra app args: $APP_ARGS"`)
+		if strings.Contains(packageType, "jar") {
+			startScriptContent.WriteRune('\n')
+			startScriptContent.WriteString(`echo "Extra jvm args: $JVM_ARGS"`)
+		}
+		startScriptContent.WriteRune('\n')
+		startScriptContent.WriteString(command[0])
+		if strings.Contains(packageType, "jar") {
+			startScriptContent.WriteString(" $JVM_ARGS")
+		}
+		startScriptContent.WriteString(ToBashCommandString(command[1:]))
+		startScriptContent.WriteString(" $APP_ARGS &> ")
+		startScriptContent.WriteString(outFile)
+		startScriptContent.WriteString(" &")
+		os.WriteFile(startScript, startScriptContent.Bytes(), 0750)
+		os.WriteFile(fmt.Sprintf("%s/scripts/kill_%s.sh", hd, name), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
 %s -kill > /dev/null
 `, strings.Join(os.Args, " "))), 0750)
-		os.WriteFile(fmt.Sprintf("%s/scripts/update_%s.sh", hd, strings.TrimSuffix(linkName, ".jar")), []byte(fmt.Sprintf(`#!/bin/sh
+		os.WriteFile(fmt.Sprintf("%s/scripts/update_%s.sh", hd, name), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
-%s > /dev/null
-`, ToBashCommandString(os.Args))), 0750)
+%s %s > /dev/null
+`, os.Args[0], ToBashCommandString(os.Args[1:]))), 0750)
 		if foundNewerVersion {
 			exec.KillService(command)
 		} else if exec.IsRunning(command) {
 			return
 		}
-		exec.StartService(command, artifactId, linkName, wd)
+		exec.StartService(startScript, outFile)
 	}()
 
 	if onlyKeepAlive {
@@ -242,10 +269,12 @@ sleep 5
 func ToBashCommandString(cmd []string) string {
 	var buf strings.Builder
 	for i := range cmd {
-		if i == 0 {
-			buf.WriteString(cmd[0])
-			continue
-		}
+		/*
+			if i == 0 {
+				buf.WriteString(cmd[0])
+				continue
+			}
+		*/
 		buf.WriteString(" \"")
 		buf.WriteString(cmd[i])
 		buf.WriteRune('"')
