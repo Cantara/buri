@@ -1,24 +1,33 @@
 package maven
 
 import (
-	log "github.com/cantara/bragi/sbragi"
-	"golang.org/x/net/html"
 	"io"
 	"net/http"
-	"os"
 	"strings"
+
+	log "github.com/cantara/bragi/sbragi"
+	"golang.org/x/net/html"
 )
 
+// var Client = http.Client{}
+var Creds *Credentials
+
+type Credentials struct {
+	Username string
+	Password string
+}
+
 func GetFileNames(url string) (filenames []string) {
-	c := http.Client{}
+	log.Trace("getting filenames", "url", url)
+	Client := http.Client{}
 	r, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		log.WithError(err).Fatal("while creating new request")
 	}
-	if os.Getenv("username") != "" {
-		r.SetBasicAuth(os.Getenv("username"), os.Getenv("password"))
+	if Creds != nil {
+		r.SetBasicAuth(Creds.Username, Creds.Password)
 	}
-	resp, err := c.Do(r)
+	resp, err := Client.Do(r)
 	if err != nil {
 		log.WithError(err).Fatal("while executing request to get param urls")
 	}
@@ -27,6 +36,7 @@ func GetFileNames(url string) (filenames []string) {
 	if err != nil {
 		log.WithError(err).Fatal("while reading body from request getting param urls")
 	}
+	log.Trace("maven", "body", body, "code", resp.StatusCode)
 	filenames = parse(string(body))
 	return
 }

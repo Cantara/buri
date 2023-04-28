@@ -1,14 +1,17 @@
 package maven
 
 import (
-	log "github.com/cantara/bragi/sbragi"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
+
+	log "github.com/cantara/bragi/sbragi"
 )
 
-func DownloadFile(path, fileName string) {
+func DownloadFile(dir, path, fileName string) {
 	log.Info("Downloading new version", "name", fileName, "path", path)
 	// Get the data
 	c := http.Client{}
@@ -28,7 +31,7 @@ func DownloadFile(path, fileName string) {
 		log.Fatal("there is no version", "os", runtime.GOOS, "arch", runtime.GOARCH)
 	}
 
-	out, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755)
+	out, err := os.OpenFile(filepath.Clean(fmt.Sprintf("%s/%s", dir, fileName)), os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		log.WithError(err).Fatal("while opening file to write download to")
 	}

@@ -9,6 +9,11 @@ import (
 	"strings"
 )
 
+var (
+	AllReleases  = must(Parse("*.*.*"))
+	AllSnapshots = must(Parse("*.*.*-SNAPSHOT"))
+)
+
 type Level int
 
 func (fl Level) Locked(l Level) bool {
@@ -106,6 +111,13 @@ func Parse(pattern string) (filter Filter, err error) {
 	}
 	filter.Level = Level(freeParts + 1)
 	return
+}
+
+func must(f Filter, err error) Filter {
+	if err != nil {
+		log.WithError(err).Fatal("while checking must condition for filter")
+	}
+	return f
 }
 
 var ErrNotValidPattern = errors.New("not a valid pattern")

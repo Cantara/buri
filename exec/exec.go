@@ -3,70 +3,93 @@ package exec
 import (
 	"context"
 	"errors"
-	log "github.com/cantara/bragi/sbragi"
-	"github.com/shirou/gopsutil/v3/process"
 	"io"
 	"os"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/shirou/gopsutil/v3/process"
+
+	log "github.com/cantara/bragi/sbragi"
 )
 
-func KillService(command []string) (killed bool) {
-	commandString := strings.Join(command, " ")
-
-	procs, err := process.Processes()
+func KillService(proc *process.Process) (killed bool) {
+	cmd, err := proc.Cmdline()
 	if err != nil {
-		log.WithError(err).Fatal("while getting processes")
+		log.WithError(err).Warning("while getting cmd")
 	}
-	for _, proc := range procs {
-		if uids, err := proc.Uids(); err != nil || int(uids[0]) != os.Getuid() {
-			continue
+	log.Info("killing", cmd)
+
+	ctxTerm, cancelTerm := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancelTerm()
+	err = proc.TerminateWithContext(ctxTerm)
+	if err != nil {
+		log.WithError(err).Warning("while trying to terminate process", "cmd", cmd)
+	} else {
+		killed = waitKilled(proc, cmd, ctxTerm)
+		if killed {
+			return
 		}
-		cmd, err := proc.Cmdline()
-		if err != nil {
-			log.WithError(err).Warning("while getting cmd")
-			continue
-		}
-		if cmd != commandString {
-			continue
-		}
-		killed = true
-		log.Info("killing", cmd)
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		err = proc.TerminateWithContext(ctx)
-		cancel() //FIXME: For some reason this is not waiting for a kill
-		if err != nil {
-			err = proc.Kill()
-			if err != nil {
-				log.WithError(err).Error("while terminating service", "cmd", cmd)
-			}
-			//TODO: Wait for killed
-		}
-		break
+	}
+
+	ctxKill, cancelKill := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancelKill()
+	err = proc.KillWithContext(ctxKill)
+	if err != nil {
+		log.WithError(err).Error("while killing process", "cmd", cmd)
+	}
+	killed = waitKilled(proc, cmd, ctxKill)
+	if killed {
+		return
 	}
 	return
 }
 
-func IsRunning(command []string) (running bool) {
-	commandString := strings.Join(command, " ")
+func waitKilled(proc *process.Process, cmd string, ctx context.Context) (killed bool) {
+	t := time.NewTicker(50 * time.Millisecond)
+	for {
+		select {
+		case <-ctx.Done():
+			return false
+		case <-t.C:
+			running, err := proc.IsRunning()
+			if err != nil {
+				log.WithError(err).Error("while checking if process is still running", "cmd", cmd)
+				return true
+			}
+			if !running {
+				return true
+			}
+		}
+	}
+}
 
+func IsRunning(base, linkName string) (proc *process.Process, running bool) {
 	procs, err := process.Processes()
 	if err != nil {
 		log.WithError(err).Fatal("while getting processes")
 	}
-	for _, proc := range procs {
-		if uids, err := proc.Uids(); err != nil || int(uids[0]) != os.Getuid() {
+	for _, proc = range procs {
+		if uids, err := proc.Uids(); err != nil || !isOwner(uids) {
+			if !isOwner(uids) {
+				log.Trace("skipping because owner was not this service user", "process", proc)
+			}
 			continue
 		}
+		log.Trace("cheking because owner was this service user", "process", proc)
 		cmd, err := proc.Cmdline()
 		if err != nil {
 			log.WithError(err).Warning("while getting cmd")
 			continue
 		}
-		if cmd != commandString {
+		if !strings.HasPrefix(cmd, base) {
 			continue
 		}
+		if !strings.Contains(cmd, linkName) {
+			continue
+		}
+
 		running = true
 		break
 	}
@@ -106,4 +129,14 @@ func MakeFile(path, content string) {
 			log.WithError(err).Warning("while closing the newly created file")
 		}
 	}()
+}
+
+func isOwner(ids []int32) bool {
+	owner := int32(os.Geteuid())
+	for _, i := range ids {
+		if i == owner {
+			return true
+		}
+	}
+	return false
 }
