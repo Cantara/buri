@@ -35,7 +35,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var filterFlagVar filterFlag
+var filterFlagVar = filterFlag{}
 
 // getCmd represents the get command
 var getCmd = &cobra.Command{
@@ -83,7 +83,7 @@ type filterFlag struct {
 }
 
 func (f *filterFlag) String() string {
-	if f == nil {
+	if f.Filter == nil {
 		return "*.*.*"
 	}
 	return f.Filter.String()
