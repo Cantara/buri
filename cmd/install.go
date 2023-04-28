@@ -48,7 +48,7 @@ The software will be downloaded to the working directory and unpackaged if neede
 		groupId, artifactId, artifactName, linkName, subArtifact := fixArtifactStrings(groupId, artifactId, packageType)
 		repoUrl, f := getConfig(artifactName)
 
-		download.Download("/Users/sindrebrurberg/tmp", packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
+		download.Download("/usr/local/bin", packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
 	},
 }
 
