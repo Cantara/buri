@@ -19,8 +19,8 @@ func DownloadFile(dir, path, fileName string) {
 	if err != nil {
 		log.WithError(err).Fatal("while creating new request")
 	}
-	if os.Getenv("username") != "" {
-		r.SetBasicAuth(os.Getenv("username"), os.Getenv("password"))
+	if Creds != nil {
+		r.SetBasicAuth(Creds.Username, Creds.Password)
 	}
 	resp, err := c.Do(r)
 	if err != nil {
