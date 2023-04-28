@@ -31,7 +31,6 @@ APP_ARGS=""`, name)
 	os.WriteFile(fmt.Sprintf("%s/scripts/restart_%s.sh", hd, name), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
 ~/scripts/kill_%[1]s.sh
-sleep 5
 ~/scripts/start_%[1]s.sh
 `, name)), 0750)
 	var startScriptContent bytes.Buffer
@@ -52,16 +51,16 @@ sleep 5
 	startScriptContent.WriteString(ToBashCommandString(cmd[1:]))
 	startScriptContent.WriteString(" $APP_ARGS &> ")
 	startScriptContent.WriteString(outFile)
-	startScriptContent.WriteString(" &")
+	startScriptContent.WriteString(" &\n")
 	os.WriteFile(startScript, startScriptContent.Bytes(), 0750)
 	os.WriteFile(fmt.Sprintf("%s/scripts/kill_%s.sh", hd, name), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
-buri kill %s -a "%s" > /dev/null
+buri kill %s -a "%s"
 `, packageType, rawArtifactId)), 0750)
 	os.WriteFile(fmt.Sprintf("%s/scripts/update_%s.sh", hd, name), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
-buri run %s -u %s > /dev/null
-`, packageType, ToBashCommandString(os.Args[3:]))), 0750)
+buri run %s -u %s
+`, packageType, ToBashCommandString(removeFromSlice("-u", os.Args[3:])))), 0750)
 	proc, running := exec.IsRunning(cmd[0], linkName)
 	if running {
 		if foundNewerVersion {
@@ -82,4 +81,25 @@ func ToBashCommandString(cmd []string) string {
 	}
 
 	return buf.String()
+}
+
+func removeFromSlice(s string, sl []string) []string {
+	out := make([]string, len(sl))
+	found := false
+	outI := 0
+	for i := range sl {
+		if sl[i] == s {
+			found = true
+			continue
+		}
+		outI = i
+		if found {
+			outI--
+		}
+		out[outI] = sl[i]
+	}
+	if found {
+		return out[:len(sl)-1]
+	}
+	return out
 }
