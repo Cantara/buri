@@ -61,7 +61,7 @@ func Download(dir, packageType, linkName, artifactId, groupId, repoUrl string, s
 	if removeLink {
 		err = os.Remove(filepath.Clean(fmt.Sprintf("%s/%s", dir, linkName)))
 		if err != nil {
-			log.WithError(err).Fatal("while removing link")
+			log.WithError(err).Warning("while removing link")
 		}
 	}
 	if packageType == "tgz" {
