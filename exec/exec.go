@@ -83,7 +83,7 @@ func IsRunning(base, linkName string) (proc *process.Process, running bool) {
 			log.WithError(err).Warning("while getting cmd")
 			continue
 		}
-		if !strings.HasPrefix(cmd, base) {
+		if !strings.HasPrefix(cmd+" ", base) {
 			continue
 		}
 		if !strings.Contains(cmd, linkName) {
