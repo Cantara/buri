@@ -70,7 +70,7 @@ Scripts and execution is done in relation to eXOReactions best practices.`,
 func init() {
 	rootCmd.AddCommand(runCmd)
 
-	runCmd.Flags().VarP(filterFlagVar, "filter", "f", "Filter for matching versions")
+	runCmd.Flags().VarP(&filterFlagVar, "filter", "f", "Filter for matching versions")
 	runCmd.Flags().StringP("artifact", "a", "buri", "Artifact id of the software")
 	runCmd.Flags().StringP("group", "g", "no.cantara.gotools", "Artifact group of the software")
 	runCmd.Flags().BoolP("update", "u", false, "Downloads and starts the new version if there was a new version.")

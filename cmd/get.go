@@ -35,7 +35,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var filterFlagVar *filterFlag
+var filterFlagVar filterFlag
 
 // getCmd represents the get command
 var getCmd = &cobra.Command{
@@ -71,7 +71,7 @@ The software will be downloaded to the working directory and unpackaged if neede
 func init() {
 	rootCmd.AddCommand(getCmd)
 
-	getCmd.Flags().VarP(filterFlagVar, "filter", "f", "Filter for matching versions")
+	getCmd.Flags().VarP(&filterFlagVar, "filter", "f", "Filter for matching versions")
 	getCmd.Flags().StringP("artifact", "a", "buri", "Artifact id of the software")
 	getCmd.Flags().StringP("group", "g", "no.cantara.gotools", "Artifact group of the software")
 
@@ -79,7 +79,7 @@ func init() {
 }
 
 type filterFlag struct {
-	filter.Filter
+	*filter.Filter
 }
 
 func (f *filterFlag) String() string {
@@ -94,7 +94,7 @@ func (f *filterFlag) Set(s string) error {
 	if err != nil {
 		return err
 	}
-	*f = filterFlag{ft}
+	*f = filterFlag{&ft}
 	return nil
 }
 
@@ -130,7 +130,7 @@ func getConfig(artifactName string) (repoUrl string, f filter.Filter) {
 	}
 
 	f = filter.AllReleases
-	if filterFlagVar == nil {
+	if filterFlagVar.Filter == nil {
 		filterString, ok := artifactConfig["filter"]
 		if !ok {
 			filterString = viper.GetString("filter")
@@ -143,7 +143,7 @@ func getConfig(artifactName string) (repoUrl string, f filter.Filter) {
 			}
 		}
 	} else {
-		f = filter.Filter(filterFlagVar.Filter)
+		f = *filterFlagVar.Filter
 	}
 
 	repoUrl = releaseUrl

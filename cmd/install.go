@@ -55,7 +55,7 @@ The software will be downloaded to the working directory and unpackaged if neede
 func init() {
 	rootCmd.AddCommand(installCmd)
 
-	installCmd.Flags().VarP(filterFlagVar, "filter", "f", "Filter for matching versions")
+	installCmd.Flags().VarP(&filterFlagVar, "filter", "f", "Filter for matching versions")
 	installCmd.Flags().StringP("artifact", "a", "buri", "Artifact id of the software")
 	installCmd.Flags().StringP("group", "g", "no.cantara.gotools", "Artifact group of the software")
 
