@@ -56,12 +56,12 @@ sleep 5
 	os.WriteFile(startScript, startScriptContent.Bytes(), 0750)
 	os.WriteFile(fmt.Sprintf("%s/scripts/kill_%s.sh", hd, name), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
-%s -kill > /dev/null
-`, strings.Join(os.Args, " "))), 0750)
+buri kill %s -a "%s" > /dev/null
+`, packageType, rawArtifactId)), 0750)
 	os.WriteFile(fmt.Sprintf("%s/scripts/update_%s.sh", hd, name), []byte(fmt.Sprintf(`#!/bin/sh
 #This script is managed by BURI https://github.com/cantara/buri
-buri run -u %s > /dev/null
-`, ToBashCommandString(os.Args[3:]))), 0750)
+buri run %s -u %s > /dev/null
+`, packageType, ToBashCommandString(os.Args[3:]))), 0750)
 	proc, running := exec.IsRunning(cmd[0], linkName)
 	if running {
 		if foundNewerVersion {
