@@ -2,16 +2,17 @@ package disk
 
 import (
 	"fmt"
-	log "github.com/cantara/bragi/sbragi"
-	"github.com/cantara/buri/readers"
-	"github.com/cantara/buri/version/filter"
-	"github.com/cantara/buri/version/generic/parser"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
+
+	log "github.com/cantara/bragi/sbragi"
+	"github.com/cantara/buri/readers"
+	"github.com/cantara/buri/version/filter"
+	"github.com/cantara/buri/version/generic/parser"
 )
 
 func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName, packageType string, numVersionsToKeep int) (versionsOnDisk []readers.Program[T], runningVersion T, removeLink bool, err error) {
@@ -85,7 +86,7 @@ func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName, packag
 	defer func() {
 		for i := 0; i < len(versionsOnDisk)-numVersionsToKeep; i++ {
 			err = os.RemoveAll(versionsOnDisk[i].Path)
-			log.WithError(err).Info("while removing ", versionsOnDisk[i].Path)
+			log.WithError(err).Info("while removing", "file", versionsOnDisk[i].Path)
 		}
 	}()
 	return
