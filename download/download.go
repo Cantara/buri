@@ -73,7 +73,7 @@ func Download(localFS fs.FS, pr PackageRepo, packageType, linkName, artifactId, 
 		linkName = strings.TrimSuffix(linkName, ".tgz")
 	} else if strings.HasPrefix(packageType, "zip") {
 		linkName = strings.TrimSuffix(linkName, ".zip")
-		fn, err := pack.UnZip(newFileName)
+		err := pack.UnZip(newFileName)
 		if err != nil {
 			log.WithError(err).Fatal("while unpacking zip")
 		}
@@ -84,12 +84,14 @@ func Download(localFS fs.FS, pr PackageRepo, packageType, linkName, artifactId, 
 		if f.Type != release.Type {
 			innerVersion = fmt.Sprintf("%s-%s", innerVersion, strings.ToUpper(string(f.Type)))
 		}
-		err = os.Symlink(fmt.Sprintf("%s/%s-%s.jar", fn, artifactId, innerVersion), linkName)
-		if err != nil {
-			log.WithError(err).Fatal("while symlinking inner jar")
-		}
-		newFileName = strings.TrimSuffix(newFileName, ".zip")
-		linkName = strings.TrimSuffix(linkName, ".jar")
+		/*
+			err = os.Symlink(fmt.Sprintf("%s/%s-%s.jar", linkName, artifactId, innerVersion), linkName)
+			if err != nil {
+				log.WithError(err).Fatal("while symlinking inner jar")
+			}
+		*/
+		//newFileName = strings.TrimSuffix(newFileName, ".zip")
+		//linkName = strings.TrimSuffix(linkName, ".jar")
 	}
 	fullLink := filepath.Clean(fmt.Sprintf("%s/%s", dir, linkName))
 	os.Remove(fullLink)

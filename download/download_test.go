@@ -42,6 +42,7 @@ func mockZip(f *os.File) {
 }
 
 func (pr Mock_PackageRepo) DownloadFile(dir, path, fileName string) {
+	log.Info("MOCK: Downloading new version", "name", fileName, "path", path)
 	out, err := os.OpenFile(filepath.Clean(fmt.Sprintf("%s/%s", dir, fileName)), os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		log.WithError(err).Fatal("while opening file to write download to")
@@ -89,6 +90,16 @@ func TestDownload(t *testing.T) {
 		}
 		if strings.Count(newFileName, packageType) > 1 {
 			t.Errorf("New file name(%s) contains the PackageType(%s) more than once.", newFileName, packageType)
+		}
+		if packageType == "tgz" || packageType == "zip" {
+			if strings.Contains(newFileName, runtime.GOARCH) {
+				t.Errorf("New file name for packaged filetyle contains arch in name")
+				continue
+			}
+			if strings.Contains(newFileName, runtime.GOOS) {
+				t.Errorf("New file name for packaged filetyle contains os in name")
+				continue
+			}
 		}
 	}
 }

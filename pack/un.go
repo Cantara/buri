@@ -5,11 +5,12 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"fmt"
-	log "github.com/cantara/bragi"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	log "github.com/cantara/bragi"
 )
 
 func UnTGZ(srcFile string) (err error) {
@@ -62,19 +63,19 @@ func UnTGZ(srcFile string) (err error) {
 	}
 }
 
-func UnZip(srcFile string) (fn string, err error) {
-	base := strings.TrimSuffix(srcFile, ".tgz")
+func UnZip(srcFile string) (err error) {
+	base := strings.TrimSuffix(srcFile, ".zip")
 	os.Mkdir(base, 0750)
 	r, err := zip.OpenReader(srcFile)
 	if err != nil {
 		return
 	}
 	defer r.Close()
-	fn = filepath.Base(srcFile)
-	fn = strings.TrimSuffix(fn, filepath.Ext(fn))
+	//fn = filepath.Base(srcFile)
+	//fn = strings.TrimSuffix(fn, filepath.Ext(fn))
 	for _, f := range r.File {
 		fmt.Printf("Contents of %s:\n", f.Name)
-		osFileName := filepath.Clean(fmt.Sprintf("%s/%s", fn, f.Name))
+		osFileName := filepath.Clean(fmt.Sprintf("%s/%s", base, f.Name))
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(osFileName, 0750)
 			continue

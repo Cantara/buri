@@ -54,7 +54,7 @@ The software will be downloaded to the working directory and unpackaged if neede
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		packageType := args[0]
+		packageType := string(serviceTypeFromString(args[0]))
 		artifactId, _ := cmd.Flags().GetString("artifact")
 		groupId, _ := cmd.Flags().GetString("group")
 
