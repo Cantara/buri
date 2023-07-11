@@ -23,14 +23,14 @@ func mockZip(f *os.File) {
 	zipWriter := zip.NewWriter(f)
 	fmt.Println("opening first file")
 	//Add files to the zip archive
-	f1, err := os.Open("download_test.go")
+	f1, err := os.Open("download.go")
 	if err != nil {
 		panic(err)
 	}
 	defer f1.Close()
 
 	fmt.Println("adding file to archive..")
-	w1, err := zipWriter.Create("download_test.go")
+	w1, err := zipWriter.Create("download.go")
 	if err != nil {
 		panic(err)
 	}
