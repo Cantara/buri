@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"strings"
 
@@ -30,6 +31,7 @@ import (
 	"github.com/cantara/buri/download"
 	"github.com/cantara/buri/readers/maven"
 	"github.com/cantara/buri/version/filter"
+	"github.com/cantara/buri/version/generic"
 	"github.com/cantara/buri/version/snapshot"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -64,7 +66,7 @@ The software will be downloaded to the working directory and unpackaged if neede
 			log.WithError(err).Fatal("while getting working dir")
 		}
 
-		download.Download(wd, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
+		download.Download(os.DirFS(wd), PackageRepo{}, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
 	},
 }
 
@@ -188,6 +190,7 @@ const (
 	PackageJar = PackageType("jar")
 	PackageGo  = PackageType("go")
 	PackageTar = PackageType("tar")
+	PackageZip = PackageType("zip")
 )
 
 func (s *PackageType) String() string {
@@ -204,10 +207,25 @@ func serviceTypeFromString(s string) (pt PackageType) {
 		pt = PackageGo
 	case "tar":
 		pt = PackageTar
+	case "zip":
+		pt = PackageZip
+	case "raw_zip":
+		pt = PackageZip
 	default:
 		//err = errors.New("unsuported service type")
 		log.Info("service type not found. treating as website / frontend") //Could be smart to return to error and use tag website and artifact for name of website
 		pt = PackageType(fmt.Sprintf("website_%s", s))
 	}
 	return
+}
+
+type PackageRepo struct {
+}
+
+func (pr PackageRepo) DownloadFile(dir, path, filename string) {
+	maven.DownloadFile(dir, path, filename)
+}
+
+func (pr PackageRepo) NewestVersion(localFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
+	return generic.NewestVersion(localFS, f, groupId, artifactId, linkName, packageType, repoUrl, numVersionsToKeep)
 }

@@ -22,6 +22,8 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"os"
+
 	"github.com/cantara/buri/download"
 	"github.com/spf13/cobra"
 )
@@ -48,7 +50,7 @@ The software will be downloaded to the working directory and unpackaged if neede
 		groupId, artifactId, artifactName, linkName, subArtifact := fixArtifactStrings(groupId, artifactId, packageType)
 		repoUrl, f := getConfig(artifactName)
 
-		download.Download("/usr/local/bin", packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
+		download.Download(os.DirFS("/usr/local/bin"), PackageRepo{}, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
 	},
 }
 

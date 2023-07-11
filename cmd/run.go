@@ -60,7 +60,7 @@ Scripts and execution is done in relation to eXOReactions best practices.`,
 
 		foundNewVersion := false
 		if update, _ := cmd.Flags().GetBool("update"); update {
-			foundNewVersion = download.Download(wd, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
+			foundNewVersion = download.Download(os.DirFS(wd), PackageRepo{}, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f) != ""
 		}
 
 		run.Run(wd, artifactIdRaw, artifactName, linkName, packageType, foundNewVersion)
