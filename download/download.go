@@ -10,7 +10,6 @@ import (
 
 	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/version/filter"
-	"github.com/cantara/buri/version/release"
 
 	log "github.com/cantara/bragi/sbragi"
 )
@@ -71,24 +70,24 @@ func Download(localFS fs.FS, pr PackageRepo, packageType, linkName, artifactId, 
 		os.Remove(newFileName)
 		newFileName = strings.TrimSuffix(newFileName, ".tgz")
 		linkName = strings.TrimSuffix(linkName, ".tgz")
-	} else if strings.HasPrefix(packageType, "zip") {
-		linkName = strings.TrimSuffix(linkName, ".zip")
+	} else if packageType == "zip" {
 		err := pack.UnZip(newFileName)
 		if err != nil {
 			log.WithError(err).Fatal("while unpacking zip")
 		}
 		os.Remove(newFileName)
-		os.Remove(linkName)
-		versionParts := strings.Split(mavenVersion, "-")
-		innerVersion := versionParts[0]
-		if f.Type != release.Type {
-			innerVersion = fmt.Sprintf("%s-%s", innerVersion, strings.ToUpper(string(f.Type)))
-		}
+		newFileName = strings.TrimSuffix(newFileName, ".zip")
+		linkName = strings.TrimSuffix(linkName, ".zip")
 		/*
-			err = os.Symlink(fmt.Sprintf("%s/%s-%s.jar", linkName, artifactId, innerVersion), linkName)
-			if err != nil {
-				log.WithError(err).Fatal("while symlinking inner jar")
+			versionParts := strings.Split(mavenVersion, "-")
+			innerVersion := versionParts[0]
+			if f.Type != release.Type {
+				innerVersion = fmt.Sprintf("%s-%s", innerVersion, strings.ToUpper(string(f.Type)))
 			}
+				err = os.Symlink(fmt.Sprintf("%s/%s-%s.jar", linkName, artifactId, innerVersion), linkName)
+				if err != nil {
+					log.WithError(err).Fatal("while symlinking inner jar")
+				}
 		*/
 		//newFileName = strings.TrimSuffix(newFileName, ".zip")
 		//linkName = strings.TrimSuffix(linkName, ".jar")
