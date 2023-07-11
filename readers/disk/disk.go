@@ -85,8 +85,9 @@ func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName, packag
 	})
 	defer func() {
 		for i := 0; i < len(versionsOnDisk)-numVersionsToKeep; i++ {
-			err = os.RemoveAll(versionsOnDisk[i].Path)
-			log.WithError(err).Info("while removing", "file", versionsOnDisk[i].Path)
+			f := filepath.Clean(fmt.Sprintf("%s/%s", disk, versionsOnDisk[i].Path))
+			err = os.RemoveAll(f)
+			log.WithError(err).Info("removing", "dir", disk, "file", versionsOnDisk[i].Path)
 		}
 	}()
 	return
