@@ -28,6 +28,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func install(afd ArtifactDownloader, pr download.PackageRepo, ch ConfigHandler, packageType, artifactId, groupId string) {
+	groupId, artifactId, artifactName, linkName, subArtifact := fixArtifactStrings(groupId, artifactId, packageType)
+	repoUrl, f := ch.Config(artifactName)
+
+	afd.Download(os.DirFS("/usr/local/bin"), pr, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
+}
+
 // installCmd represents the get command
 var installCmd = &cobra.Command{
 	Use:   "install <packageType>",
@@ -43,14 +50,16 @@ The software will be downloaded to the working directory and unpackaged if neede
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		packageType := args[0]
+		packageType := string(serviceTypeFromString(args[0]))
 		artifactId, _ := cmd.Flags().GetString("artifact")
 		groupId, _ := cmd.Flags().GetString("group")
 
-		groupId, artifactId, artifactName, linkName, subArtifact := fixArtifactStrings(groupId, artifactId, packageType)
-		repoUrl, f := getConfig(artifactName)
-
-		download.Download(os.DirFS("/usr/local/bin"), PackageRepo{}, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
+		install(
+			download.ArtifactDownloader{},
+			PackageRepo{},
+			ViperConfigHandler{},
+			packageType, artifactId, groupId,
+		)
 	},
 }
 

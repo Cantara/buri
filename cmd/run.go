@@ -26,9 +26,25 @@ import (
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/download"
-	"github.com/cantara/buri/run"
 	"github.com/spf13/cobra"
 )
+
+func runCMD(afd ArtifactDownloader, ch ConfigHandler, runner Runner, packageType, artifactId, groupId string, update bool) {
+	groupId, artifactId, artifactName, linkName, subArtifact := fixArtifactStrings(groupId, artifactId, packageType)
+	repoUrl, f := ch.Config(artifactName)
+
+	wd, err := os.Getwd()
+	if err != nil {
+		log.WithError(err).Fatal("while getting working dir")
+	}
+
+	foundNewVersion := false
+	if update {
+		foundNewVersion = afd.Download(os.DirFS(wd), PackageRepo{}, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f) != ""
+	}
+
+	runner.Start(wd, artifactId, artifactName, linkName, packageType, foundNewVersion)
+}
 
 // runCmd represents the run command
 var runCmd = &cobra.Command{
@@ -46,24 +62,16 @@ Scripts and execution is done in relation to eXOReactions best practices.`,
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		packageType := args[0]
-		artifactIdRaw, _ := cmd.Flags().GetString("artifact")
+		packageType := string(serviceTypeFromString(args[0]))
+		artifactId, _ := cmd.Flags().GetString("artifact")
 		groupId, _ := cmd.Flags().GetString("group")
+		update, _ := cmd.Flags().GetBool("update")
 
-		groupId, artifactId, artifactName, linkName, subArtifact := fixArtifactStrings(groupId, artifactIdRaw, packageType)
-		repoUrl, f := getConfig(artifactName)
-
-		wd, err := os.Getwd()
-		if err != nil {
-			log.WithError(err).Fatal("while getting working dir")
-		}
-
-		foundNewVersion := false
-		if update, _ := cmd.Flags().GetBool("update"); update {
-			foundNewVersion = download.Download(os.DirFS(wd), PackageRepo{}, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f) != ""
-		}
-
-		run.Run(wd, artifactIdRaw, artifactName, linkName, packageType, foundNewVersion)
+		runCMD(download.ArtifactDownloader{},
+			ViperConfigHandler{},
+			LocalRunner{},
+			packageType, artifactId, groupId, update,
+		)
 	},
 }
 

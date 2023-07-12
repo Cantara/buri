@@ -15,11 +15,14 @@ import (
 )
 
 type PackageRepo interface {
-	DownloadFile(dir, path, filename string)
+	DownloadFile(dir, path, filename string) (fullNewFilePath string)
 	NewestVersion(localFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error)
 }
 
-func Download(localFS fs.FS, pr PackageRepo, packageType, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (newFileName string) {
+type ArtifactDownloader struct {
+}
+
+func (_ ArtifactDownloader) Download(localFS fs.FS, pr PackageRepo, packageType, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (newFileName string) {
 	dir := fmt.Sprint(localFS)
 	command := []string{fmt.Sprintf("%s/%s", localFS, linkName)}
 	if strings.HasSuffix(packageType, "jar") {
@@ -58,7 +61,7 @@ func Download(localFS fs.FS, pr PackageRepo, packageType, linkName, artifactId, 
 	}
 	// Create the file
 
-	pr.DownloadFile(dir, path, newFileName)
+	fullNewFilePath := pr.DownloadFile(dir, path, newFileName)
 	if removeLink {
 		err = os.Remove(filepath.Clean(fmt.Sprintf("%s/%s", dir, linkName)))
 		if err != nil {
@@ -66,17 +69,17 @@ func Download(localFS fs.FS, pr PackageRepo, packageType, linkName, artifactId, 
 		}
 	}
 	if packageType == "tgz" {
-		pack.UnTGZ(newFileName)
-		os.Remove(newFileName)
-		newFileName = strings.TrimSuffix(newFileName, ".tgz")
+		pack.UnTGZ(fullNewFilePath)
+		os.Remove(fullNewFilePath)
+		fullNewFilePath = strings.TrimSuffix(fullNewFilePath, ".tgz")
 		linkName = strings.TrimSuffix(linkName, ".tgz")
 	} else if packageType == "zip" {
-		err := pack.UnZip(newFileName)
+		err := pack.UnZip(fullNewFilePath)
 		if err != nil {
 			log.WithError(err).Fatal("while unpacking zip")
 		}
-		os.Remove(newFileName)
-		newFileName = strings.TrimSuffix(newFileName, ".zip")
+		os.Remove(fullNewFilePath)
+		fullNewFilePath = strings.TrimSuffix(fullNewFilePath, ".zip")
 		linkName = strings.TrimSuffix(linkName, ".zip")
 		/*
 			versionParts := strings.Split(mavenVersion, "-")

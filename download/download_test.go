@@ -15,7 +15,7 @@ import (
 	"github.com/cantara/buri/version/filter"
 )
 
-type Mock_PackageRepo struct {
+type MockPackageRepo struct {
 }
 
 func mockZip(f *os.File) {
@@ -41,9 +41,11 @@ func mockZip(f *os.File) {
 	zipWriter.Close()
 }
 
-func (pr Mock_PackageRepo) DownloadFile(dir, path, fileName string) {
+func (pr MockPackageRepo) DownloadFile(dir, path, fileName string) (fullNewFilePath string) {
 	log.Info("MOCK: Downloading new version", "name", fileName, "path", path)
-	out, err := os.OpenFile(filepath.Clean(fmt.Sprintf("%s/%s", dir, fileName)), os.O_RDWR|os.O_CREATE, 0755)
+
+	fullNewFilePath = filepath.Clean(fmt.Sprintf("%s/%s", dir, fileName))
+	out, err := os.OpenFile(fullNewFilePath, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
 		log.WithError(err).Fatal("while opening file to write download to")
 	}
@@ -51,9 +53,10 @@ func (pr Mock_PackageRepo) DownloadFile(dir, path, fileName string) {
 	if strings.HasSuffix(fileName, ".zip") {
 		mockZip(out)
 	}
+	return
 }
 
-func (pr Mock_PackageRepo) NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
+func (pr MockPackageRepo) NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
 	runtime.Gosched()
 	return "", "1.0.0", false, nil //This moch will probably fail
 }
@@ -73,7 +76,7 @@ func TestClean(t *testing.T) {
 }
 
 func TestDownload(t *testing.T) {
-	pr := Mock_PackageRepo{}
+	pr := MockPackageRepo{}
 	dir := "."
 	artifactId := "testArtifact"
 	linkName := artifactId
@@ -83,7 +86,8 @@ func TestDownload(t *testing.T) {
 	f := filter.AllReleases
 
 	for _, packageType := range []string{"go", "jar", "tgz", "zip"} {
-		newFileName := Download(os.DirFS(dir), pr, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
+		newFileName := ArtifactDownloader{}.
+			Download(os.DirFS(dir), pr, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
 		if newFileName == "" {
 			t.Errorf("Package Type %s is not downloadable!", packageType)
 			continue
