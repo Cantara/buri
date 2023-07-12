@@ -1,3 +1,12 @@
+#All but
+*
+!**/
+!**.go
+!**.md
+!**.sh
+!renovate.json
+!.gitignore
+
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -16,9 +25,4 @@
 
 .idea
 
-#Files
-*
-!*.go
-!*.md
-!*.sh
-!renovate.json
+**Test/

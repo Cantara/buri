@@ -97,7 +97,7 @@ func (_ ArtifactDownloader) Download(localFS fs.FS, pr PackageRepo, packageType,
 	}
 	fullLink := filepath.Clean(fmt.Sprintf("%s/%s", dir, linkName))
 	os.Remove(fullLink)
-	err = os.Symlink(newFileName, fullLink)
+	err = os.Symlink(fullNewFilePath, fullLink)
 	if err != nil {
 		log.WithError(err).Fatal("while sym linking")
 	}
