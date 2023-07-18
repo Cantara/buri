@@ -7,8 +7,8 @@ import (
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/download"
-	"github.com/cantara/buri/readers/maven"
-	"github.com/cantara/buri/run"
+	"github.com/cantara/buri/packageRepo/maven"
+	"github.com/cantara/buri/runner/start"
 	"github.com/cantara/buri/version/filter"
 	"github.com/cantara/buri/version/generic"
 	"github.com/cantara/buri/version/snapshot"
@@ -143,6 +143,8 @@ func serviceTypeFromString(s string) (pt PackageType) {
 		pt = PackageJar
 	case "go":
 		pt = PackageGo
+	case "tgz":
+		pt = PackageTar
 	case "tar":
 		pt = PackageTar
 	case "zip":
@@ -185,7 +187,7 @@ type LocalRunner struct {
 }
 
 func (_ LocalRunner) Start(dir, artifactId, name, linkName, packageType string, foundNewerVersion bool) {
-	run.Run(dir, artifactId, name, linkName, packageType, foundNewerVersion)
+	start.Run(dir, artifactId, name, linkName, packageType, foundNewerVersion)
 }
 
 func (_ LocalRunner) IsRunning(artifactId string) bool {

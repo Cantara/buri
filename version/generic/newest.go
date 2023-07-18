@@ -2,15 +2,16 @@ package generic
 
 import (
 	"fmt"
+	"io/fs"
+
 	log "github.com/cantara/bragi/sbragi"
+	"github.com/cantara/buri/disk"
+	"github.com/cantara/buri/packageRepo/maven"
 	"github.com/cantara/buri/readers"
-	"github.com/cantara/buri/readers/disk"
-	"github.com/cantara/buri/readers/maven"
 	"github.com/cantara/buri/version"
 	"github.com/cantara/buri/version/filter"
 	"github.com/cantara/buri/version/release"
 	"github.com/cantara/buri/version/snapshot"
-	"io/fs"
 )
 
 func NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
@@ -42,7 +43,7 @@ func newestVersion[T readers.Version[T]](diskFS fs.FS, f filter.Filter, groupId,
 	if !foundNewerVersion {
 		return
 	}
-	mavenPath = versionInMavem.Path
+	mavenPath = versionInMavem.DownloadPath()
 	mavenVersion = versionInMavem.Version.String()
 	return
 }

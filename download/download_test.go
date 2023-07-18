@@ -85,7 +85,7 @@ func TestDownload(t *testing.T) {
 	subArtifact := []string{artifactId}
 	f := filter.AllReleases
 
-	for _, packageType := range []string{"go", "jar", "tgz", "zip"} {
+	for _, packageType := range []string{"go", "jar", "tar", "zip"} {
 		newFileName := ArtifactDownloader{}.
 			Download(os.DirFS(dir), pr, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
 		if newFileName == "" {
@@ -95,7 +95,7 @@ func TestDownload(t *testing.T) {
 		if strings.Count(newFileName, packageType) > 1 {
 			t.Errorf("New file name(%s) contains the PackageType(%s) more than once.", newFileName, packageType)
 		}
-		if packageType == "tgz" || packageType == "zip" {
+		if packageType == "tar" || packageType == "zip" {
 			if strings.Contains(newFileName, runtime.GOARCH) {
 				t.Errorf("New file name for packaged filetyle contains arch in name")
 				continue

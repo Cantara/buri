@@ -8,7 +8,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/cantara/buri/pack"
+	"github.com/cantara/buri/packages/tar"
+	"github.com/cantara/buri/packages/zip"
 	"github.com/cantara/buri/version/filter"
 
 	log "github.com/cantara/bragi/sbragi"
@@ -46,7 +47,7 @@ func (_ ArtifactDownloader) Download(localFS fs.FS, pr PackageRepo, packageType,
 		case "jar":
 			newFileName = fmt.Sprintf("%s.jar", newFileName)
 			path = fmt.Sprintf("%s.jar", path)
-		case "tgz":
+		case "tar":
 			newFileName = fmt.Sprintf("%s.tgz", newFileName)
 			path = fmt.Sprintf("%s.tgz", path)
 		case "zip":
@@ -60,6 +61,7 @@ func (_ ArtifactDownloader) Download(localFS fs.FS, pr PackageRepo, packageType,
 		return
 	}
 	// Create the file
+	log.Trace("new version", "os", runtime.GOOS, "arch", runtime.GOARCH, "packageType", packageType, "file", newFileName)
 
 	fullNewFilePath := pr.DownloadFile(dir, path, newFileName)
 	if removeLink {
@@ -68,13 +70,13 @@ func (_ ArtifactDownloader) Download(localFS fs.FS, pr PackageRepo, packageType,
 			log.WithError(err).Warning("while removing link")
 		}
 	}
-	if packageType == "tgz" {
-		pack.UnTGZ(fullNewFilePath)
+	if packageType == "tar" {
+		tar.Unpack(fullNewFilePath)
 		os.Remove(fullNewFilePath)
 		fullNewFilePath = strings.TrimSuffix(fullNewFilePath, ".tgz")
 		linkName = strings.TrimSuffix(linkName, ".tgz")
 	} else if packageType == "zip" {
-		err := pack.UnZip(fullNewFilePath)
+		err := zip.Unpack(fullNewFilePath)
 		if err != nil {
 			log.WithError(err).Fatal("while unpacking zip")
 		}

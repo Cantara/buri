@@ -25,8 +25,8 @@ import (
 	"os"
 
 	log "github.com/cantara/bragi/sbragi"
-	"github.com/cantara/buri/command"
-	"github.com/cantara/buri/exec"
+	"github.com/cantara/buri/runner/start"
+	"github.com/cantara/buri/runner/start/command"
 	"github.com/spf13/cobra"
 )
 
@@ -60,12 +60,12 @@ to quickly create a Cobra application.`,
 		}
 
 		artifactCmd := command.Create(wd, linkName, packageType)
-		proc, running := exec.IsRunning(artifactCmd[0], linkName)
+		proc, running := start.IsRunning(artifactCmd[0], linkName)
 		if !running {
 			return
 		}
 		log.Info("process is running, killing")
-		exec.KillService(proc)
+		start.KillService(proc)
 	},
 }
 

@@ -1,10 +1,11 @@
 package readers
 
 import (
+	"strings"
+
 	"github.com/cantara/buri/version/filter"
 	"github.com/cantara/buri/version/release"
 	"github.com/cantara/buri/version/snapshot"
-	"time"
 )
 
 type VersionType interface {
@@ -18,7 +19,11 @@ type Version[T any] interface {
 }
 
 type Program[T Version[T]] struct {
-	Path        string
-	Version     T
-	UpdatedTime time.Time
+	Path    string
+	Version T
+	//UpdatedTime time.Time
+}
+
+func (p Program[T]) DownloadPath() string {
+	return strings.ReplaceAll(p.Path, "service/rest/repository/browse/", "repository/") + "/"
 }
