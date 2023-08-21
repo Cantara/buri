@@ -2,8 +2,6 @@ module github.com/cantara/buri
 
 go 1.21
 
-toolchain go1.21.0
-
 require (
 	github.com/cantara/bragi v0.7.1
 	github.com/shirou/gopsutil/v3 v3.23.3
