@@ -38,6 +38,14 @@ func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName, packag
 				runningVersionString = strings.TrimSuffix(runningVersionString, ".jar")
 				artifactId = strings.TrimSuffix(artifactId, ".jar")
 			}
+			if strings.HasSuffix(packageType, "tar") { //should probably just do this always
+				runningVersionString = strings.TrimSuffix(runningVersionString, ".tgz")
+				artifactId = strings.TrimSuffix(artifactId, ".tgz")
+			}
+			if strings.HasSuffix(packageType, "zip") { //should probably just do this always
+				runningVersionString = strings.TrimSuffix(runningVersionString, ".zip")
+				artifactId = strings.TrimSuffix(artifactId, ".zip")
+			}
 			runningVersionString = strings.TrimPrefix(runningVersionString, artifactId+"-")
 			log.Trace("modified link", "path", path, "link", linkPath, "artifactId", artifactId, "filename", fileName, "version", runningVersionString)
 			runningVersionAny, err := parser.Parse(f, runningVersionString)
@@ -54,6 +62,8 @@ func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName, packag
 			log.Debug(linkName)
 			name := filepath.Base(path)
 			name = strings.TrimSuffix(name, ".jar")
+			name = strings.TrimSuffix(name, ".zip")
+			name = strings.TrimSuffix(name, ".tgz")
 			name = strings.ReplaceAll(name, "-"+runtime.GOOS, "")
 			name = strings.ReplaceAll(name, "-"+runtime.GOARCH, "")
 			name = strings.ReplaceAll(name, "-SNAPSHOT", "")

@@ -149,8 +149,6 @@ func serviceTypeFromString(s string) (pt PackageType) {
 		pt = PackageTar
 	case "zip":
 		pt = PackageZip
-	case "raw_zip":
-		pt = PackageZip
 	default:
 		//err = errors.New("unsuported service type")
 		log.Info("service type not found. treating as website / frontend") //Could be smart to return to error and use tag website and artifact for name of website
@@ -172,6 +170,10 @@ func (pr PackageRepo) NewestVersion(localFS fs.FS, f filter.Filter, groupId, art
 
 type ArtifactDownloader interface {
 	Download(localFS fs.FS, pr download.PackageRepo, packageType, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (newFileName string)
+}
+
+type Unpacker interface {
+	Unpack(localFS fs.FS, fullFileName, packageType, linkName string)
 }
 
 type ConfigHandler interface {

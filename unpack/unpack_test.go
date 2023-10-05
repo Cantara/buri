@@ -1,4 +1,4 @@
-package download
+package unpack
 
 import (
 	"archive/zip"
@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	log "github.com/cantara/bragi/sbragi"
+	"github.com/cantara/buri/download"
 	"github.com/cantara/buri/version/filter"
 )
 
@@ -23,14 +24,14 @@ func mockZip(f *os.File) {
 	zipWriter := zip.NewWriter(f)
 	fmt.Println("opening first file")
 	//Add files to the zip archive
-	f1, err := os.Open("download.go")
+	f1, err := os.Open("unpack.go")
 	if err != nil {
 		panic(err)
 	}
 	defer f1.Close()
 
 	fmt.Println("adding file to archive..")
-	w1, err := zipWriter.Create("download.go")
+	w1, err := zipWriter.Create("unpack.go")
 	if err != nil {
 		panic(err)
 	}
@@ -75,7 +76,7 @@ func TestClean(t *testing.T) {
 	})
 }
 
-func TestDownload(t *testing.T) {
+func TestUnpack(t *testing.T) {
 	pr := MockPackageRepo{}
 	dir := "."
 	artifactId := "testArtifact"
@@ -85,9 +86,10 @@ func TestDownload(t *testing.T) {
 	subArtifact := []string{artifactId}
 	f := filter.AllReleases
 
-	for _, packageType := range []string{"go", "jar", "tar", "zip"} {
-		newFileName := ArtifactDownloader{}.
-			Download(os.DirFS(dir), pr, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
+	for _, packageType := range []string{"tar", "zip"} {
+		fs := os.DirFS(dir)
+		newFileName := download.ArtifactDownloader{}.
+			Download(fs, pr, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
 		if newFileName == "" {
 			t.Errorf("Package Type %s is not downloadable!", packageType)
 			continue
@@ -105,5 +107,6 @@ func TestDownload(t *testing.T) {
 				continue
 			}
 		}
+		Unpacker{}.Unpack(fs, newFileName, packageType, linkName)
 	}
 }

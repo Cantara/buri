@@ -3,6 +3,7 @@ package tar
 import (
 	"archive/tar"
 	"compress/gzip"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -12,6 +13,11 @@ import (
 )
 
 func Unpack(srcFile string) (err error) {
+	defer func() {
+		if errors.Is(err, io.EOF) {
+			err = nil
+		}
+	}()
 	base := strings.TrimSuffix(srcFile, ".tgz")
 	os.Mkdir(base, 0750)
 	tgz, err := os.Open(srcFile)

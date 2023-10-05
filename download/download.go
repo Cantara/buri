@@ -8,8 +8,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/cantara/buri/packages/tar"
-	"github.com/cantara/buri/packages/zip"
 	"github.com/cantara/buri/version/filter"
 
 	log "github.com/cantara/bragi/sbragi"
@@ -23,7 +21,7 @@ type PackageRepo interface {
 type ArtifactDownloader struct {
 }
 
-func (_ ArtifactDownloader) Download(localFS fs.FS, pr PackageRepo, packageType, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (newFileName string) {
+func (_ ArtifactDownloader) Download(localFS fs.FS, pr PackageRepo, packageType, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (fullNewFilePath string) {
 	dir := fmt.Sprint(localFS)
 	command := []string{fmt.Sprintf("%s/%s", localFS, linkName)}
 	if strings.HasSuffix(packageType, "jar") {
@@ -31,6 +29,7 @@ func (_ ArtifactDownloader) Download(localFS fs.FS, pr PackageRepo, packageType,
 	}
 	var path string
 	mavenPath, mavenVersion, removeLink, err := pr.NewestVersion(localFS, f, groupId, artifactId, linkName, packageType, repoUrl, 4)
+	var newFileName string
 	if mavenVersion != "" {
 		log.Info("new version found", "version", mavenVersion)
 		if len(subArtifact) == 1 {
@@ -63,42 +62,14 @@ func (_ ArtifactDownloader) Download(localFS fs.FS, pr PackageRepo, packageType,
 	// Create the file
 	log.Trace("new version", "os", runtime.GOOS, "arch", runtime.GOARCH, "packageType", packageType, "file", newFileName)
 
-	fullNewFilePath := pr.DownloadFile(dir, path, newFileName)
+	fullNewFilePath = pr.DownloadFile(dir, path, newFileName)
+	fullLink := filepath.Clean(fmt.Sprintf("%s/%s", dir, linkName))
 	if removeLink {
-		err = os.Remove(filepath.Clean(fmt.Sprintf("%s/%s", dir, linkName)))
 		if err != nil {
 			log.WithError(err).Warning("while removing link")
 		}
+		os.Remove(fullLink)
 	}
-	if packageType == "tar" {
-		tar.Unpack(fullNewFilePath)
-		os.Remove(fullNewFilePath)
-		fullNewFilePath = strings.TrimSuffix(fullNewFilePath, ".tgz")
-		linkName = strings.TrimSuffix(linkName, ".tgz")
-	} else if packageType == "zip" {
-		err := zip.Unpack(fullNewFilePath)
-		if err != nil {
-			log.WithError(err).Fatal("while unpacking zip")
-		}
-		os.Remove(fullNewFilePath)
-		fullNewFilePath = strings.TrimSuffix(fullNewFilePath, ".zip")
-		linkName = strings.TrimSuffix(linkName, ".zip")
-		/*
-			versionParts := strings.Split(mavenVersion, "-")
-			innerVersion := versionParts[0]
-			if f.Type != release.Type {
-				innerVersion = fmt.Sprintf("%s-%s", innerVersion, strings.ToUpper(string(f.Type)))
-			}
-				err = os.Symlink(fmt.Sprintf("%s/%s-%s.jar", linkName, artifactId, innerVersion), linkName)
-				if err != nil {
-					log.WithError(err).Fatal("while symlinking inner jar")
-				}
-		*/
-		//newFileName = strings.TrimSuffix(newFileName, ".zip")
-		//linkName = strings.TrimSuffix(linkName, ".jar")
-	}
-	fullLink := filepath.Clean(fmt.Sprintf("%s/%s", dir, linkName))
-	os.Remove(fullLink)
 	err = os.Symlink(fullNewFilePath, fullLink)
 	if err != nil {
 		log.WithError(err).Fatal("while sym linking")

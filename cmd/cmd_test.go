@@ -66,7 +66,7 @@ func (pr MockPackageRepo) DownloadFile(dir, path, fileName string) (fullNewFileP
 
 func (pr MockPackageRepo) NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
 	runtime.Gosched()
-	return "", "1.0.0", false, nil //This moch will probably fail
+	return "", "1.0.0", true, nil //This moch will probably fail
 }
 
 func TestClean(t *testing.T) {
@@ -115,6 +115,12 @@ func (_ MockGetDownloader) Download(localFS fs.FS, pr download.PackageRepo, pack
 	return download.ArtifactDownloader{}.Download(os.DirFS(installDir), pr, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
 }
 
+type MockGetUnpacker struct {
+}
+
+func (_ MockGetUnpacker) Unpack(_ fs.FS, _, _, _ string) {
+}
+
 var packageTypes = []string{"go", "jar", "tar", "zip"}
 
 func TestInstall(t *testing.T) {
@@ -136,11 +142,12 @@ func TestGet(t *testing.T) {
 	md := MockGetDownloader{}
 	mpr := MockPackageRepo{}
 	mch := MockConfigHandler{}
+	mup := MockGetUnpacker{}
 
 	artifactId := "testArtifact"
 	groupId := "testGroup"
 
 	for _, packageType := range packageTypes {
-		get(md, mpr, mch, packageType, artifactId, groupId)
+		get(md, mup, mpr, mch, packageType, artifactId, groupId, false)
 	}
 }

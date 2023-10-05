@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/spf13/cobra"
@@ -77,10 +78,13 @@ func initConfig() {
 		cobra.CheckErr(err)
 
 		// Search config in config directory with name ".buri" (without extension).
+		config = filepath.Clean(fmt.Sprintf("%s/buri", config))
 		viper.AddConfigPath(config)
 		viper.SetConfigType("yaml")
 		viper.SetConfigName(".buri")
+		viper.SetConfigFile(filepath.Clean(fmt.Sprintf("%s/buri.yaml", config)))
 	}
+	log.Info("Using config", "file", viper.ConfigFileUsed(), "config", cfgFile)
 
 	viper.AutomaticEnv() // read in environment variables that match
 
