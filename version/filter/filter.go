@@ -3,10 +3,11 @@ package filter
 import (
 	"errors"
 	"fmt"
-	log "github.com/cantara/bragi/sbragi"
-	"github.com/cantara/buri/version"
 	"strconv"
 	"strings"
+
+	log "github.com/cantara/bragi/sbragi"
+	"github.com/cantara/buri/version"
 )
 
 var (
@@ -71,6 +72,7 @@ func (f Filter) String() string {
 }
 
 func Parse(pattern string) (filter Filter, err error) {
+	pattern = strings.TrimPrefix(pattern, "v")
 	base := strings.Split(pattern, "-")
 	filter.Type = version.Base //This is a bit weird
 	if len(base) == 2 {

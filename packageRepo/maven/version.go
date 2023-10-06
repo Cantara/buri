@@ -17,7 +17,7 @@ func newestVersion(f filter.Filter, packT string, versions []string) (newest rel
 			if !strings.HasPrefix(v, "v") {
 				continue
 			}
-			v = strings.TrimPrefix(v, "v")
+			//v = strings.TrimPrefix(v, "v")
 		}
 		if !f.Matches(v) {
 			continue
@@ -70,10 +70,12 @@ func Version[T readers.Version[T]](f filter.Filter, url, packageType string) (ne
 		if packageType == "go" && !strings.HasPrefix(version, "v") {
 			continue
 		}
-		if strings.HasSuffix(packageType, "jar") {
+		switch packageType {
+		case "jar":
 			version = strings.TrimSuffix(version, ".jar")
-		}
-		if strings.HasPrefix(packageType, "zip") {
+		case "tar":
+			version = strings.TrimSuffix(version, ".tgz")
+		case "zip":
 			version = strings.TrimSuffix(version, ".zip")
 		}
 		versionString := strings.TrimSuffix(version, "/")
