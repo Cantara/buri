@@ -44,9 +44,9 @@ func Version[T readers.Version[T]](f filter.Filter, url, packageType string) (ne
 	path := fmt.Sprintf("%s/%s", strings.TrimSuffix(url, "/"), relVers)
 	vers := relVers.String()
 	if f.Type != release.Type {
-		vers = strings.TrimSuffix(vers, "-"+strings.ToUpper(string(f.Type)))
+		path = path + "-" + strings.ToUpper(string(f.Type))
 	}
-	log.Trace("read", "version", vers, "path", path)
+	log.Trace("read", "version", vers, "path", path, "type", f.Type)
 	prog := readers.Program[release.Version]{
 		Path:    path,
 		Version: relVers,

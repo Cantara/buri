@@ -78,6 +78,7 @@ func Parse(pattern string) (filter Filter, err error) {
 	if len(base) == 2 {
 		filter.Type = version.Type(strings.ToLower(base[1]))
 	}
+	log.Debug("filter parsing", "type", filter.Type, "base", base, "pattern", pattern)
 	parts := strings.Split(base[0], ".")
 	if len(parts) > 3 || len(parts) == 0 {
 		err = ErrNotValidPattern

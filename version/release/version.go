@@ -3,11 +3,12 @@ package release
 import (
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
+
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/version"
 	"github.com/cantara/buri/version/filter"
-	"strconv"
-	"strings"
 )
 
 type Style int
@@ -101,6 +102,7 @@ func (v Version) IsStrictlySemanticNewer(filter filter.Filter, v2 Version) bool 
 }
 
 func Parse(s string) (v Version, err error) {
+	s = strings.Split(s, "-")[0]
 	var style Style
 	if strings.HasPrefix(s, "v") {
 		style = GoStyle
