@@ -10,12 +10,13 @@ import (
 	"strings"
 
 	log "github.com/cantara/bragi/sbragi"
+	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/readers"
 	"github.com/cantara/buri/version/filter"
 	"github.com/cantara/buri/version/generic/parser"
 )
 
-func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName, packageType string, numVersionsToKeep int) (versionsOnDisk []readers.Program[T], runningVersion T, removeLink bool, err error) {
+func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName string, packageType pack.Type, numVersionsToKeep int) (versionsOnDisk []readers.Program[T], runningVersion T, removeLink bool, err error) {
 	err = fs.WalkDir(disk, ".", func(path string, d fs.DirEntry, err error) error {
 		if path == "." {
 			return nil
@@ -34,15 +35,14 @@ func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName, packag
 			fileName := strings.ReplaceAll(strings.ReplaceAll(filepath.Base(linkPath), "-"+runtime.GOOS, ""), "-"+runtime.GOARCH, "")
 			//fileNameEls := strings.Split(fileName, "-")
 			runningVersionString := fileName
-			if strings.HasSuffix(packageType, "jar") { //should probably just do this always
+			switch packageType {
+			case pack.Jar:
 				runningVersionString = strings.TrimSuffix(runningVersionString, ".jar")
 				artifactId = strings.TrimSuffix(artifactId, ".jar")
-			}
-			if strings.HasSuffix(packageType, "tar") { //should probably just do this always
+			case pack.Tar:
 				runningVersionString = strings.TrimSuffix(runningVersionString, ".tgz")
 				artifactId = strings.TrimSuffix(artifactId, ".tgz")
-			}
-			if strings.HasSuffix(packageType, "zip") { //should probably just do this always
+			case pack.Zip:
 				runningVersionString = strings.TrimSuffix(runningVersionString, ".zip")
 				artifactId = strings.TrimSuffix(artifactId, ".zip")
 			}

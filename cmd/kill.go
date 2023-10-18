@@ -25,6 +25,7 @@ import (
 	"os"
 
 	log "github.com/cantara/bragi/sbragi"
+	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/runner/start"
 	"github.com/cantara/buri/runner/start/command"
 	"github.com/spf13/cobra"
@@ -43,12 +44,12 @@ to quickly create a Cobra application.`,
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return []string{string(PackageJar), string(PackageGo), string(PackageTar)}, cobra.ShellCompDirectiveNoFileComp
+			return []string{string(pack.Jar), string(pack.Go)}, cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		packageType := string(serviceTypeFromString(args[0]))
+		packageType := pack.TypeFromString(args[0])
 		artifactIdRaw, _ := cmd.Flags().GetString("artifact")
 		groupId, _ := cmd.Flags().GetString("group")
 

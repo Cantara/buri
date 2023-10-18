@@ -26,13 +26,14 @@ import (
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/download"
+	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/unpack"
 	"github.com/spf13/cobra"
 )
 
 var filterFlagVar = filterFlag{}
 
-func get(afd ArtifactDownloader, unpkr Unpacker, pr download.PackageRepo, ch ConfigHandler, packageType, artifactId, groupId string, unpack bool) {
+func get(afd ArtifactDownloader, unpkr Unpacker, pr download.PackageRepo, ch ConfigHandler, packageType pack.Type, artifactId, groupId string, unpack bool) {
 	groupId, artifactId, artifactName, linkName, subArtifact := fixArtifactStrings(groupId, artifactId, packageType)
 	repoUrl, f := ch.Config(artifactName)
 
@@ -41,11 +42,14 @@ func get(afd ArtifactDownloader, unpkr Unpacker, pr download.PackageRepo, ch Con
 		log.WithError(err).Fatal("while getting working dir")
 	}
 	dir := os.DirFS(wd)
+	if unpack {
+		linkName = packageType.TrimExtention(linkName)
+	}
 	fullPath := afd.Download(dir, pr, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
 	if !unpack || fullPath == "" {
 		return
 	}
-	unpkr.Unpack(dir, fullPath, packageType, linkName)
+	unpkr.Unpack(dir, fullPath, linkName, packageType)
 }
 
 // getCmd represents the get command
@@ -58,12 +62,12 @@ The software will be downloaded to the working directory and unpackaged if neede
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return []string{string(PackageJar), string(PackageGo), string(PackageTar), string(PackageZip)}, cobra.ShellCompDirectiveNoFileComp
+			return []string{string(pack.Jar), string(pack.Go), string(pack.Tar), string(pack.Zip)}, cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		packageType := string(serviceTypeFromString(args[0]))
+		packageType := pack.TypeFromString(args[0])
 		artifactId, _ := cmd.Flags().GetString("artifact")
 		groupId, _ := cmd.Flags().GetString("group")
 		up, _ := cmd.Flags().GetBool("unpack")

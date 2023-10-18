@@ -13,6 +13,7 @@ import (
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/download"
+	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/version/filter"
 )
 
@@ -57,7 +58,7 @@ func (pr MockPackageRepo) DownloadFile(dir, path, fileName string) (fullNewFileP
 	return
 }
 
-func (pr MockPackageRepo) NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
+func (pr MockPackageRepo) NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName string, packageType pack.Type, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
 	runtime.Gosched()
 	return "", "1.0.0", true, nil //This moch will probably fail
 }
@@ -86,7 +87,7 @@ func TestUnpack(t *testing.T) {
 	subArtifact := []string{artifactId}
 	f := filter.AllReleases
 
-	for _, packageType := range []string{"tar", "zip"} {
+	for _, packageType := range []pack.Type{pack.Tar, pack.Zip} {
 		fs := os.DirFS(dir)
 		newFileName := download.ArtifactDownloader{}.
 			Download(fs, pr, packageType, linkName, artifactId, groupId, repoUrl, subArtifact, f)
@@ -94,7 +95,7 @@ func TestUnpack(t *testing.T) {
 			t.Errorf("Package Type %s is not downloadable!", packageType)
 			continue
 		}
-		if strings.Count(newFileName, packageType) > 1 {
+		if strings.Count(newFileName, packageType.String()) > 1 {
 			t.Errorf("New file name(%s) contains the PackageType(%s) more than once.", newFileName, packageType)
 		}
 		if packageType == "tar" || packageType == "zip" {
@@ -107,6 +108,6 @@ func TestUnpack(t *testing.T) {
 				continue
 			}
 		}
-		Unpacker{}.Unpack(fs, newFileName, packageType, linkName)
+		Unpacker{}.Unpack(fs, newFileName, linkName, packageType)
 	}
 }

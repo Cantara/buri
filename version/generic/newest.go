@@ -6,6 +6,7 @@ import (
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/disk"
+	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/packageRepo/maven"
 	"github.com/cantara/buri/readers"
 	"github.com/cantara/buri/version"
@@ -14,7 +15,7 @@ import (
 	"github.com/cantara/buri/version/snapshot"
 )
 
-func NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
+func NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName string, packageType pack.Type, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
 	log.Info("finding newest version", "filter", f)
 	switch f.Type {
 	case snapshot.Type:
@@ -28,7 +29,7 @@ func NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName,
 	return
 }
 
-func newestVersion[T readers.Version[T]](diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
+func newestVersion[T readers.Version[T]](diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName string, packageType pack.Type, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
 	var runningVersion T
 	_, runningVersion, removeLink, err = disk.Version[T](diskFS, f, linkName, packageType, numVersionsToKeep)
 	if err != nil {

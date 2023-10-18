@@ -7,6 +7,7 @@ import (
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/download"
+	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/packageRepo/maven"
 	"github.com/cantara/buri/runner/start"
 	"github.com/cantara/buri/version/filter"
@@ -104,7 +105,7 @@ func (_ ViperConfigHandler) Config(artifactName string) (repoUrl string, f filte
 	return
 }
 
-func fixArtifactStrings(groupIdIn, artifactIdIn, packageType string) (groupId, artifactId, artifactName, linkName string, subArtifact []string) {
+func fixArtifactStrings(groupIdIn, artifactIdIn string, packageType pack.Type) (groupId, artifactId, artifactName, linkName string, subArtifact []string) {
 	groupId = strings.ReplaceAll(groupIdIn, ".", "/")
 	artifactId = strings.ReplaceAll(artifactIdIn, ".", "/")
 	subArtifact = strings.Split(artifactId, "/")
@@ -116,43 +117,13 @@ func fixArtifactStrings(groupIdIn, artifactIdIn, packageType string) (groupId, a
 		linkName = fmt.Sprintf("%s-%s", linkName, strings.Join(subArtifact[1:], "-"))
 	}
 
-	if strings.HasSuffix(packageType, "jar") {
+	switch packageType {
+	case pack.Jar:
 		linkName = fmt.Sprintf("%s.jar", linkName)
-	}
-	return
-}
-
-type PackageType string
-
-const (
-	PackageJar = PackageType("jar")
-	PackageGo  = PackageType("go")
-	PackageTar = PackageType("tar")
-	PackageZip = PackageType("zip")
-)
-
-func (s *PackageType) String() string {
-	return fmt.Sprint(*s)
-}
-
-func serviceTypeFromString(s string) (pt PackageType) {
-	switch strings.ToLower(s) {
-	case "java":
-		pt = PackageJar
-	case "jar":
-		pt = PackageJar
-	case "go":
-		pt = PackageGo
-	case "tgz":
-		pt = PackageTar
-	case "tar":
-		pt = PackageTar
-	case "zip":
-		pt = PackageZip
-	default:
-		//err = errors.New("unsuported service type")
-		log.Info("service type not found. treating as website / frontend") //Could be smart to return to error and use tag website and artifact for name of website
-		pt = PackageType(fmt.Sprintf("website_%s", s))
+	case pack.Tar:
+		linkName = fmt.Sprintf("%s.tgz", linkName)
+	case pack.Zip:
+		linkName = fmt.Sprintf("%s.zip", linkName)
 	}
 	return
 }
@@ -164,16 +135,16 @@ func (pr PackageRepo) DownloadFile(dir, path, filename string) string {
 	return maven.DownloadFile(dir, path, filename)
 }
 
-func (pr PackageRepo) NewestVersion(localFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
+func (pr PackageRepo) NewestVersion(localFS fs.FS, f filter.Filter, groupId, artifactId, linkName string, packageType pack.Type, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
 	return generic.NewestVersion(localFS, f, groupId, artifactId, linkName, packageType, repoUrl, numVersionsToKeep)
 }
 
 type ArtifactDownloader interface {
-	Download(localFS fs.FS, pr download.PackageRepo, packageType, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (newFileName string)
+	Download(localFS fs.FS, pr download.PackageRepo, packageType pack.Type, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (newFileName string)
 }
 
 type Unpacker interface {
-	Unpack(localFS fs.FS, fullFileName, packageType, linkName string)
+	Unpack(localFS fs.FS, fullFileName, linkName string, packageType pack.Type)
 }
 
 type ConfigHandler interface {
@@ -182,13 +153,13 @@ type ConfigHandler interface {
 
 type Runner interface {
 	IsRunning(artifactId string) bool
-	Start(dir, artifactId, name, linkName, packageType string, foundNewerVersion bool)
+	Start(dir, artifactId, name, linkName string, packageType pack.Type, foundNewerVersion bool)
 }
 
 type LocalRunner struct {
 }
 
-func (_ LocalRunner) Start(dir, artifactId, name, linkName, packageType string, foundNewerVersion bool) {
+func (_ LocalRunner) Start(dir, artifactId, name, linkName string, packageType pack.Type, foundNewerVersion bool) {
 	start.Run(dir, artifactId, name, linkName, packageType, foundNewerVersion)
 }
 

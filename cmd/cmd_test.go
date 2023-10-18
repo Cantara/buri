@@ -13,6 +13,7 @@ import (
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/download"
+	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/version/filter"
 )
 
@@ -64,7 +65,7 @@ func (pr MockPackageRepo) DownloadFile(dir, path, fileName string) (fullNewFileP
 	return
 }
 
-func (pr MockPackageRepo) NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName, packageType, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
+func (pr MockPackageRepo) NewestVersion(diskFS fs.FS, f filter.Filter, groupId, artifactId, linkName string, packageType pack.Type, repoUrl string, numVersionsToKeep int) (mavenPath, mavenVersion string, removeLink bool, err error) {
 	runtime.Gosched()
 	return "", "1.0.0", true, nil //This moch will probably fail
 }
@@ -92,7 +93,7 @@ var globalT *testing.T
 type MockInstallDownloader struct {
 }
 
-func (_ MockInstallDownloader) Download(localFS fs.FS, pr download.PackageRepo, packageType, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (newFileName string) {
+func (_ MockInstallDownloader) Download(localFS fs.FS, pr download.PackageRepo, packageType pack.Type, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (newFileName string) {
 	if fmt.Sprint(localFS) != "/usr/local/bin" {
 		globalT.Errorf("install directory not set correctly for packageType(%s). dir=\"%s\"", packageType, localFS)
 	}
@@ -106,7 +107,7 @@ type MockGetDownloader struct {
 
 var wd, _ = os.Getwd()
 
-func (_ MockGetDownloader) Download(localFS fs.FS, pr download.PackageRepo, packageType, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (newFileName string) {
+func (_ MockGetDownloader) Download(localFS fs.FS, pr download.PackageRepo, packageType pack.Type, linkName, artifactId, groupId, repoUrl string, subArtifact []string, f filter.Filter) (newFileName string) {
 	if fmt.Sprint(localFS) != wd {
 		globalT.Errorf("install directory not set correctly for packageType(%s). dir=\"%s\"", packageType, localFS)
 	}
@@ -118,10 +119,10 @@ func (_ MockGetDownloader) Download(localFS fs.FS, pr download.PackageRepo, pack
 type MockGetUnpacker struct {
 }
 
-func (_ MockGetUnpacker) Unpack(_ fs.FS, _, _, _ string) {
+func (_ MockGetUnpacker) Unpack(_ fs.FS, _, _ string, _ pack.Type) {
 }
 
-var packageTypes = []string{"go", "jar", "tar", "zip"}
+var packageTypes = []pack.Type{pack.Go, pack.Jar, pack.Tar, pack.Zip}
 
 func TestInstall(t *testing.T) {
 	globalT = t

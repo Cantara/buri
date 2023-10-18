@@ -25,10 +25,11 @@ import (
 	"os"
 
 	"github.com/cantara/buri/download"
+	"github.com/cantara/buri/pack"
 	"github.com/spf13/cobra"
 )
 
-func install(afd ArtifactDownloader, pr download.PackageRepo, ch ConfigHandler, packageType, artifactId, groupId string) {
+func install(afd ArtifactDownloader, pr download.PackageRepo, ch ConfigHandler, packageType pack.Type, artifactId, groupId string) {
 	groupId, artifactId, artifactName, linkName, subArtifact := fixArtifactStrings(groupId, artifactId, packageType)
 	repoUrl, f := ch.Config(artifactName)
 
@@ -45,12 +46,12 @@ The software will be downloaded to the working directory and unpackaged if neede
 	Args: cobra.ExactArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return []string{string(PackageJar), string(PackageGo), string(PackageTar)}, cobra.ShellCompDirectiveNoFileComp
+			return []string{string(pack.Jar), string(pack.Go)}, cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
 	Run: func(cmd *cobra.Command, args []string) {
-		packageType := string(serviceTypeFromString(args[0]))
+		packageType := pack.TypeFromString(args[0])
 		artifactId, _ := cmd.Flags().GetString("artifact")
 		groupId, _ := cmd.Flags().GetString("group")
 

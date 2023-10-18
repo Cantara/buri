@@ -5,15 +5,16 @@ import (
 	"strings"
 
 	log "github.com/cantara/bragi/sbragi"
+	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/readers"
 	"github.com/cantara/buri/version/filter"
 	"github.com/cantara/buri/version/generic/parser"
 	"github.com/cantara/buri/version/release"
 )
 
-func newestVersion(f filter.Filter, packT string, versions []string) (newest release.Version) {
+func newestVersion(f filter.Filter, packT pack.Type, versions []string) (newest release.Version) {
 	for _, v := range versions {
-		if packT == "go" {
+		if packT == pack.Go {
 			if !strings.HasPrefix(v, "v") {
 				continue
 			}
@@ -37,7 +38,7 @@ func newestVersion(f filter.Filter, packT string, versions []string) (newest rel
 	return
 }
 
-func Version[T readers.Version[T]](f filter.Filter, url, packageType string) (newestMaven readers.Program[T]) {
+func Version[T readers.Version[T]](f filter.Filter, url string, packageType pack.Type) (newestMaven readers.Program[T]) {
 	log.Info("maven version", "url", url)
 	relVers := newestVersion(f, packageType, GetTableValues(url))
 	log.Trace("finding artifact in maven", "version", relVers)

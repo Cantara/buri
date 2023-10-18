@@ -7,10 +7,11 @@ import (
 	"strings"
 
 	log "github.com/cantara/bragi/sbragi"
+	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/runner/start/command"
 )
 
-func Run(dir, rawArtifactId, name, linkName, packageType string, foundNewerVersion bool) {
+func Run(dir, rawArtifactId, name, linkName string, packageType pack.Type, foundNewerVersion bool) {
 	hd, err := os.UserHomeDir()
 	if err != nil {
 		log.WithError(err).Fatal("while getting home dir")
@@ -21,7 +22,7 @@ func Run(dir, rawArtifactId, name, linkName, packageType string, foundNewerVersi
 	argsFile := fmt.Sprintf("%s/%s.args", dir, name)
 	argsFileContent := fmt.Sprintf(`#ARG's file for %s
 APP_ARGS=""`, name)
-	if strings.Contains(packageType, "jar") {
+	if packageType == pack.Jar {
 		argsFileContent = argsFileContent + "\nJVM_ARGS=\"\""
 	}
 	MakeFile(argsFile, argsFileContent)
@@ -37,13 +38,13 @@ APP_ARGS=""`, name)
 	startScriptContent.WriteString(argsFile)
 	startScriptContent.WriteRune('\n')
 	startScriptContent.WriteString(`echo "Extra app args: $APP_ARGS"`)
-	if strings.Contains(packageType, "jar") {
+	if packageType == pack.Jar {
 		startScriptContent.WriteRune('\n')
 		startScriptContent.WriteString(`echo "Extra jvm args: $JVM_ARGS"`)
 	}
 	startScriptContent.WriteRune('\n')
 	startScriptContent.WriteString(cmd[0])
-	if strings.Contains(packageType, "jar") {
+	if packageType == pack.Jar {
 		startScriptContent.WriteString(" $JVM_ARGS")
 	}
 	startScriptContent.WriteString(ToBashCommandString(cmd[1:]))
