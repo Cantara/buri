@@ -32,7 +32,7 @@ func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName string,
 			linkPathParts := strings.Split(linkPath, "/")
 			linkPath = linkPathParts[len(linkPathParts)-1]
 			artifactId := linkName
-			fileName := strings.ReplaceAll(strings.ReplaceAll(filepath.Base(linkPath), "-"+runtime.GOOS, ""), "-"+runtime.GOARCH, "")
+			fileName := filepath.Base(linkPath)
 			//fileNameEls := strings.Split(fileName, "-")
 			runningVersionString := fileName
 			switch packageType {
@@ -45,6 +45,8 @@ func Version[T readers.Version[T]](disk fs.FS, f filter.Filter, linkName string,
 			case pack.Zip:
 				runningVersionString = strings.TrimSuffix(runningVersionString, ".zip")
 				artifactId = strings.TrimSuffix(artifactId, ".zip")
+			case pack.Go:
+				fileName = strings.TrimSuffix(strings.TrimSuffix(fileName, "-"+runtime.GOARCH), "-"+runtime.GOOS)
 			}
 			runningVersionString = strings.TrimPrefix(runningVersionString, artifactId+"-")
 			log.Trace("modified link", "path", path, "link", linkPath, "artifactId", artifactId, "filename", fileName, "version", runningVersionString)
