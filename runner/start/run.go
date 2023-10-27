@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/runner/start/command"
 )
 
-func Run(dir, rawArtifactId, name, linkName string, packageType pack.Type, foundNewerVersion bool) {
+func Run(dir, rawArtifactId, name, linkName string, packageType pack.Type, foundNewerVersion bool, timeout time.Duration) {
 	hd, err := os.UserHomeDir()
 	if err != nil {
 		log.WithError(err).Fatal("while getting home dir")
@@ -63,7 +64,7 @@ buri run %s -u %s
 	proc, running := IsRunning(cmd[0], linkName)
 	if running {
 		if foundNewerVersion {
-			KillService(proc)
+			KillService(proc, timeout)
 		} else {
 			return
 		}

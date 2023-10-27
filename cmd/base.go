@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"strings"
+	"time"
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/download"
@@ -160,7 +161,11 @@ type LocalRunner struct {
 }
 
 func (_ LocalRunner) Start(dir, artifactId, name, linkName string, packageType pack.Type, foundNewerVersion bool) {
-	start.Run(dir, artifactId, name, linkName, packageType, foundNewerVersion)
+	timeout := time.Second * 10
+	if st := viper.GetInt("stop_timeout"); st > 0 {
+		timeout = time.Second * time.Duration(st)
+	}
+	start.Run(dir, artifactId, name, linkName, packageType, foundNewerVersion, timeout)
 }
 
 func (_ LocalRunner) IsRunning(artifactId string) bool {
