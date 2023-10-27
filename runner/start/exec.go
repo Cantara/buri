@@ -14,14 +14,14 @@ import (
 	log "github.com/cantara/bragi/sbragi"
 )
 
-func KillService(proc *process.Process) (killed bool) {
+func KillService(proc *process.Process, timeout time.Duration) (killed bool) {
 	cmd, err := proc.Cmdline()
 	if err != nil {
 		log.WithError(err).Warning("while getting cmd")
 	}
 	log.Info("killing", cmd)
 
-	ctxTerm, cancelTerm := context.WithTimeout(context.Background(), time.Second*10)
+	ctxTerm, cancelTerm := context.WithTimeout(context.Background(), timeout)
 	defer cancelTerm()
 	err = proc.TerminateWithContext(ctxTerm)
 	if err != nil {

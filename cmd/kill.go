@@ -23,12 +23,14 @@ package cmd
 
 import (
 	"os"
+	"time"
 
 	log "github.com/cantara/bragi/sbragi"
 	"github.com/cantara/buri/pack"
 	"github.com/cantara/buri/runner/start"
 	"github.com/cantara/buri/runner/start/command"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // killCmd represents the kill command
@@ -55,6 +57,11 @@ to quickly create a Cobra application.`,
 
 		_, _, _, linkName, _ := fixArtifactStrings(groupId, artifactIdRaw, packageType)
 
+		timeout := time.Second * 10
+		if st := viper.GetInt("stop_timeout"); st > 0 {
+			timeout = time.Second * time.Duration(st)
+		}
+
 		wd, err := os.Getwd()
 		if err != nil {
 			log.WithError(err).Fatal("while getting working dir")
@@ -66,7 +73,7 @@ to quickly create a Cobra application.`,
 			return
 		}
 		log.Info("process is running, killing")
-		start.KillService(proc)
+		start.KillService(proc, timeout)
 	},
 }
 
