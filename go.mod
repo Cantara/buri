@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/cantara/bragi v0.7.4
-	github.com/shirou/gopsutil/v3 v3.23.9
+	github.com/shirou/gopsutil/v3 v3.23.10
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.17.0
 	golang.org/x/net v0.17.0
