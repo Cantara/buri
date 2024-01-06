@@ -3,7 +3,7 @@ module github.com/cantara/buri
 go 1.21
 
 require (
-	github.com/cantara/bragi v0.7.4
+	github.com/cantara/bragi v0.8.0
 	github.com/shirou/gopsutil/v3 v3.23.10
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.18.2
