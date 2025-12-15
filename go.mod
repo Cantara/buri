@@ -7,7 +7,7 @@ toolchain go1.25.5
 require (
 	github.com/cantara/bragi v0.8.0
 	github.com/shirou/gopsutil/v3 v3.24.5
-	github.com/spf13/cobra v1.9.1
+	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	golang.org/x/net v0.48.0
 )
