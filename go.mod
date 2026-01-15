@@ -2,7 +2,7 @@ module github.com/cantara/buri
 
 go 1.24.0
 
-toolchain go1.25.5
+toolchain go1.25.6
 
 require (
 	github.com/cantara/bragi v0.8.0
