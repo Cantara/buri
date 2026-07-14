@@ -6,6 +6,8 @@
 !**.sh
 !renovate.json
 !.gitignore
+!knowledge.yaml
+!knowledge.yaml.sig
 
 # Binaries for programs and plugins
 *.exe
